@@ -1,0 +1,209 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #a7a5ff;
+  --color-primary-dim: #645efb;
+  --color-secondary: #34c9ff;
+  --color-bg: #0e0e0e;
+  --color-surface: #131313;
+  --color-surface-muted: #201f1f;
+  --color-surface-highest: #262626;
+  --color-text: #d7d9e1;
+  --color-muted: #8b8f9f;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-border: rgba(167, 165, 255, 0.2);
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --font-heading: "Plus Jakarta Sans", "Manrope", sans-serif;
+  --font-body: "Manrope", sans-serif;
+  --font-label: "Inter", sans-serif;
+  font-family: var(--font-body);
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  line-height: 1.5;
+}
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+header,
+section > div,
+main > div {
+  animation: fadeSlide 380ms ease-out;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+.ui-label {
+  font-family: var(--font-label);
+  letter-spacing: 0.03em;
+}
+
+@layer components {
+  .ui-shell-brand-name {
+    @apply block truncate text-sm font-semibold leading-5;
+  }
+
+  .ui-shell-brand-tagline {
+    @apply block truncate text-xs leading-5;
+  }
+
+  .ui-shell-nav {
+    @apply text-sm font-medium;
+  }
+
+  .ui-shell-title {
+    @apply truncate text-2xl font-semibold leading-tight sm:text-[1.625rem];
+  }
+
+  .ui-shell-subtitle {
+    @apply truncate text-sm leading-6;
+  }
+
+  .ui-page-kicker {
+    @apply text-xs font-medium uppercase tracking-[0.18em] text-[var(--color-muted)];
+  }
+
+  .ui-page-title {
+    @apply text-2xl font-semibold leading-tight text-slate-100 sm:text-[1.875rem];
+  }
+
+  .ui-page-subtitle {
+    @apply text-sm leading-6 text-slate-300;
+  }
+
+  .ui-section-title {
+    @apply text-lg font-semibold leading-7 text-slate-100 sm:text-xl;
+  }
+
+  .ui-card {
+    @apply rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-[var(--color-text)] shadow-[0_14px_36px_rgba(2,6,20,0.34)] sm:p-6;
+  }
+
+  .ui-card-soft {
+    @apply rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 text-[var(--color-text)] sm:p-6;
+  }
+
+  .ui-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white transition duration-200 hover:translate-y-[-1px] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ui-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-slate-200 transition duration-200 hover:bg-[var(--color-surface-muted)] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ui-input {
+    @apply w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-blue-500/30;
+  }
+
+  .ui-textarea {
+    @apply w-full resize-y rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-blue-500/30;
+  }
+
+  .ui-chip {
+    @apply inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1 text-xs font-medium text-slate-200;
+  }
+}
+
+@layer utilities {
+  .app-shell-dark .text-slate-900 {
+    color: #e2e8f0 !important;
+  }
+
+  .app-shell-dark .text-slate-800 {
+    color: #cbd5e1 !important;
+  }
+
+  .app-shell-dark .text-slate-700,
+  .app-shell-dark .text-slate-600,
+  .app-shell-dark .text-slate-500 {
+    color: #94a3b8 !important;
+  }
+
+  .app-shell-dark .bg-white,
+  .app-shell-dark .bg-white\/95,
+  .app-shell-dark .bg-white\/90,
+  .app-shell-dark .bg-white\/85,
+  .app-shell-dark .bg-white\/80,
+  .app-shell-dark .bg-white\/40 {
+    background-color: #0b1433 !important;
+  }
+
+  .app-shell-dark .bg-slate-50,
+  .app-shell-dark .bg-sky-50,
+  .app-shell-dark .bg-blue-50,
+  .app-shell-dark .bg-amber-50,
+  .app-shell-dark .bg-red-50,
+  .app-shell-dark .bg-emerald-50,
+  .app-shell-dark .bg-cyan-50,
+  .app-shell-dark .bg-violet-50,
+  .app-shell-dark .bg-indigo-50 {
+    background-color: #101c42 !important;
+  }
+
+  .app-shell-dark .border-slate-100,
+  .app-shell-dark .border-slate-200,
+  .app-shell-dark .border-sky-100,
+  .app-shell-dark .border-sky-200,
+  .app-shell-dark .border-blue-200,
+  .app-shell-dark .border-blue-300,
+  .app-shell-dark .border-cyan-200,
+  .app-shell-dark .border-cyan-300,
+  .app-shell-dark .border-amber-200,
+  .app-shell-dark .border-amber-300,
+  .app-shell-dark .border-violet-200,
+  .app-shell-dark .border-violet-300,
+  .app-shell-dark .border-emerald-200,
+  .app-shell-dark .border-emerald-300,
+  .app-shell-dark .border-fuchsia-300,
+  .app-shell-dark .border-indigo-300,
+  .app-shell-dark .border-red-200 {
+    border-color: #334155 !important;
+  }
+}
