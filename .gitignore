@@ -15,7 +15,12 @@ venv/
 # Node
 node_modules/
 dist/
+build/
 *.tsbuildinfo
+
+# Logs
+*.log
+
 
 # OS
 .DS_Store
@@ -23,3 +28,4 @@ Thumbs.db
 
 # IDE
 .idea/
+.vscode/
