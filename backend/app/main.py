@@ -27,6 +27,10 @@ async def startup() -> None:
 async def health() -> HealthOut:
     return HealthOut(status="ok")
 
+# this is the start of the file
+@app.get("/")
+def root():
+    return {"message": "CareerPilot AI Backend Running "}
 
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(practice.router, prefix="/api/practice", tags=["practice"])
