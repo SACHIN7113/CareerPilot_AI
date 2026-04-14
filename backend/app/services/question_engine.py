@@ -3,9 +3,9 @@ import re
 from typing import Sequence
 
 from app.core.async_utils import run_blocking
-from app.config.settings import settings
 from app.services.gemini_service import (
     _extract_text_sync as extract_text,
+    _generation_model_names_sync as generation_model_names,
     _get_model_sync as get_model,
     _parse_json_response_sync as parse_json_response,
 )
@@ -529,21 +529,7 @@ class QuestionEngine:
         raise RuntimeError(f"LLM question generation failed: {message[:180]}")
 
     def _candidate_model_names(self) -> list[str]:
-        preferred = [
-            "models/gemini-2.5-flash",
-            settings.gemini_model,
-            "models/gemini-2.5-flash-lite",
-            "models/gemini-flash-lite-latest",
-        ]
-        seen: set[str] = set()
-        ordered: list[str] = []
-        for item in preferred:
-            if not item:
-                continue
-            if item not in seen:
-                ordered.append(item)
-                seen.add(item)
-        return ordered
+        return generation_model_names()
 
     def _llm_generate(self, model, *, context: str, difficulty: int, attempt_index: int) -> tuple[str, str]:
         difficulty_label = {1: "easy", 2: "medium", 3: "hard"}.get(difficulty, "easy")

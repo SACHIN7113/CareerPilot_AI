@@ -4,7 +4,7 @@ from typing import Any
 from app.core.async_utils import run_blocking
 from app.services.gemini_service import (
     _extract_text_sync as extract_text,
-    _get_model_sync as get_model,
+    _generate_content_with_fallback_sync as generate_content_with_fallback,
     _parse_json_response_sync as parse_json_response,
 )
 
@@ -177,10 +177,6 @@ async def extract_jd_identity(text: str, filename: str = "") -> dict[str, str]:
 
 
 def _build_jd_overview_with_llm(normalized_text: str) -> dict[str, Any] | None:
-    model = get_model()
-    if model is None:
-        return None
-
     prompt = (
         "Analyze this company job description and return a student-friendly summary in strict JSON. "
         "Return only JSON with keys: company_name, role_title, overview, required_skills, key_requirements, what_to_prepare. "
@@ -189,8 +185,8 @@ def _build_jd_overview_with_llm(normalized_text: str) -> dict[str, Any] | None:
     )
 
     try:
-        response = model.generate_content(
-            f"{prompt}\n\nJD:\n{normalized_text[:9000]}",
+        response, _used_model = generate_content_with_fallback(
+            prompt=f"{prompt}\n\nJD:\n{normalized_text[:9000]}",
             generation_config={"temperature": 0.15, "response_mime_type": "application/json"},
         )
         parsed = parse_json_response(extract_text(response) or "{}")

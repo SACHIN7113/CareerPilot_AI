@@ -4,6 +4,7 @@ from difflib import SequenceMatcher
 from app.core.async_utils import run_blocking
 from app.services.gemini_service import (
     _extract_text_sync as extract_text,
+    _generate_content_with_fallback_sync as generate_content_with_fallback,
     _get_model_sync as get_model,
     _parse_json_response_sync as parse_json_response,
 )
@@ -103,8 +104,8 @@ class EvaluationEngine:
             "Return only JSON in this format: "
             '{"verdict":"CORRECT|PARTIAL|INCORRECT","feedback":"one short supportive sentence"}'
         )
-        response = self.model.generate_content(
-            f"{prompt}\n\nExpected: {expected_answer}\nStudent: {user_answer}",
+        response, _used_model = generate_content_with_fallback(
+            prompt=f"{prompt}\n\nExpected: {expected_answer}\nStudent: {user_answer}",
             generation_config={"temperature": 0.1, "response_mime_type": "application/json"},
         )
         raw = extract_text(response) or "{}"

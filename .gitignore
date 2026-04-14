@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
 .venv/
 venv/
 .env
@@ -10,7 +15,11 @@ venv/
 # Node
 node_modules/
 dist/
+*.tsbuildinfo
 
 # OS
 .DS_Store
 Thumbs.db
+
+# IDE
+.idea/

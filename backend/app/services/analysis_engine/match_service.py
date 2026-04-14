@@ -127,6 +127,7 @@ class AnalysisMatchMixin:
         )
 
         llm_result: dict = {}
+        llm_refinement_warning = ""
         if should_use_llm:
             try:
                 llm_result = self._llm_structured_analysis(
@@ -144,9 +145,9 @@ class AnalysisMatchMixin:
                 )
             except RuntimeError as exc:
                 if settings.analysis_llm_refinement:
-                    raise RuntimeError(
-                        "LLM analysis is required but could not be completed. Please verify GEMINI_API_KEY/model/quota and retry."
-                    ) from exc
+                    llm_refinement_warning = (
+                        "LLM refinement was unavailable, so heuristic analysis was used for this result."
+                    )
                 llm_result = {}
 
         llm_score_raw = self._as_score((llm_result or {}).get("overall_score"), baseline_score)
@@ -244,6 +245,8 @@ class AnalysisMatchMixin:
         resume_highlights = llm_result.get("resume_highlights") or self._extract_key_points(resume_text, limit=5)
         recommendations = llm_result.get("recommendations") or self._build_recommendations(missing_keywords, critical_missing_skills)
         recommendations = self._merge_unique(recommendations + practice_evaluation["practice_feedback"], max_items=6)
+        if llm_refinement_warning:
+            recommendations = self._merge_unique(recommendations + [llm_refinement_warning], max_items=6)
         summary = llm_result.get("summary") or (
             f"Resume to JD match is {overall_score}%. Matched {len(matched_keywords)} key requirement areas."
         )

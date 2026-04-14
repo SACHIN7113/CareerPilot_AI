@@ -1,4 +1,6 @@
-const API_URL = "http://localhost:8000";
+const API_URL = String(
+  import.meta.env.VITE_API_URL || "http://localhost:8000",
+).replace(/\/+$/, "");
 const REQUEST_TIMEOUT_MS = 45000;
 const inflightGetRequests = new Map();
 const getResponseCache = new Map();
@@ -65,7 +67,8 @@ function extractErrorMessage(payload, fallback = "Request failed") {
 
 async function request(path, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
-  const dedupeEnabled = method === "GET" && options.dedupe !== false && !options.signal;
+  const dedupeEnabled =
+    method === "GET" && options.dedupe !== false && !options.signal;
   const dedupeKey = dedupeEnabled ? `${method}:${path}` : "";
   const cacheTtlMs = method === "GET" ? Number(options.cacheTtlMs || 0) : 0;
   const cacheEnabled = cacheTtlMs > 0 && !options.signal;
@@ -91,7 +94,10 @@ async function request(path, options = {}) {
 
     for (let attempt = 0; attempt <= retryCount; attempt += 1) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs + attempt * 5000);
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        timeoutMs + attempt * 5000,
+      );
       const headers = { ...(options.headers || {}) };
       if (accessToken) {
         headers.Authorization = `Bearer ${accessToken}`;
@@ -108,15 +114,19 @@ async function request(path, options = {}) {
           const payload = await response.json().catch(() => ({}));
           if (response.status === 401 && path !== "/api/auth/login") {
             clearSession();
-            if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+            if (
+              typeof window !== "undefined" &&
+              window.location.pathname !== "/login"
+            ) {
               window.location.replace("/login");
             }
             throw new Error("Your session expired. Please sign in again.");
           }
 
-          const fallback = response.status >= 500
-            ? "Server is currently busy. Please try again shortly."
-            : "Request failed";
+          const fallback =
+            response.status >= 500
+              ? "Server is currently busy. Please try again shortly."
+              : "Request failed";
           const error = new Error(extractErrorMessage(payload, fallback));
           error.status = response.status;
           throw error;
@@ -139,15 +149,21 @@ async function request(path, options = {}) {
         const canRetry = attempt < retryCount && (isAbort || isNetwork);
 
         if (canRetry) {
-          await new Promise((resolve) => setTimeout(resolve, 550 * (attempt + 1)));
+          await new Promise((resolve) =>
+            setTimeout(resolve, 550 * (attempt + 1)),
+          );
           continue;
         }
 
         if (isAbort) {
-          throw new Error("Server took too long to respond. Please retry in a few seconds.");
+          throw new Error(
+            "Server took too long to respond. Please retry in a few seconds.",
+          );
         }
         if (isNetwork) {
-          throw new Error("Cannot connect to server. Ensure backend is running on localhost:8000.");
+          throw new Error(
+            "Cannot connect to server. Ensure backend is running on localhost:8000.",
+          );
         }
         throw error;
       } finally {
@@ -156,7 +172,6 @@ async function request(path, options = {}) {
     }
 
     throw new Error("Request failed. Please try again.");
-
   };
 
   if (!dedupeKey) {
@@ -174,7 +189,7 @@ export function register(name, email, password) {
   return request("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email, password })
+    body: JSON.stringify({ name, email, password }),
   });
 }
 
@@ -182,7 +197,7 @@ export async function login(email, password) {
   const payload = await request("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password }),
   });
   setToken(payload.access_token);
   return payload;
@@ -219,7 +234,7 @@ export function uploadDocument(file) {
   formData.append("file", file);
   return request("/api/documents/upload", {
     method: "POST",
-    body: formData
+    body: formData,
   }).then((payload) => {
     invalidateGetCache(["/api/documents"]);
     return payload;
@@ -240,7 +255,7 @@ export function startPractice(documentId, options = {}) {
   return request("/api/practice/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 }
 
@@ -252,7 +267,11 @@ export function submitAnswer(sessionId, questionId, answer) {
   return request("/api/practice/answer", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, question_id: questionId, answer })
+    body: JSON.stringify({
+      session_id: sessionId,
+      question_id: questionId,
+      answer,
+    }),
   });
 }
 

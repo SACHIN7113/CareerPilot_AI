@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     mongodb_fallback_to_local: bool = True
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"
+    gemini_model_fallbacks: str = (
+        "models/gemini-2.5-flash,models/gemini-2.0-flash,"
+        "models/gemini-2.5-flash-lite,models/gemini-flash-lite-latest"
+    )
     gemini_embedding_model: str = "models/embedding-001"
     embedding_dimensions: int = 1536
     cors_origins: str = "http://localhost:5173"

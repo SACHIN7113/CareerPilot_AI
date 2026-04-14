@@ -6,6 +6,7 @@ from app.config.settings import settings
 from app.core.async_utils import run_blocking
 from app.services.gemini_service import (
     _extract_text_sync as extract_text,
+    _generation_model_names_sync as generation_model_names,
     _get_model_sync as get_model,
     _parse_json_response_sync as parse_json_response,
 )
@@ -30,22 +31,7 @@ def _generate_json_with_timeout(*, model: Any, prompt: str, context: str, timeou
 
 
 def _candidate_model_names() -> list[str]:
-    preferred = [
-        "models/gemini-2.5-flash",
-        settings.gemini_model,
-        "models/gemini-2.5-flash-lite",
-        "models/gemini-2.0-flash",
-        "models/gemini-flash-lite-latest",
-    ]
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for item in preferred:
-        model_name = str(item or "").strip()
-        if not model_name or model_name in seen:
-            continue
-        ordered.append(model_name)
-        seen.add(model_name)
-    return ordered
+    return generation_model_names(preferred_models=["models/gemini-2.5-flash"])
 
 
 def _infer_roadmap_domain(target: str) -> str:

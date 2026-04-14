@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiBookOpen, FiClock, FiFileText, FiSearch, FiTrendingUp } from "react-icons/fi";
+import { FiBookOpen, FiClock, FiSearch, FiTrendingUp } from "react-icons/fi";
 
 import AppShell from "../components/layout/AppShell";
 import { listDocuments } from "../api";
@@ -18,7 +18,9 @@ function toMs(value) {
 }
 
 function trimText(value, max = 150) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!text) return "-";
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
@@ -43,7 +45,9 @@ function buildUploadRows(documents, localHistory) {
     }));
 
   const merged = [...fromDb, ...localOnly];
-  const deduped = Array.from(new Map(merged.map((item) => [item.id, item])).values());
+  const deduped = Array.from(
+    new Map(merged.map((item) => [item.id, item])).values(),
+  );
   return deduped.sort((a, b) => toMs(b.uploadedAt) - toMs(a.uploadedAt));
 }
 
@@ -51,7 +55,9 @@ export default function ScoresPage() {
   const didLoadHistoryRef = useRef(false);
   const [stats, setStats] = useState(readPracticeStats());
   const [documents, setDocuments] = useState([]);
-  const [uploadHistory, setUploadHistory] = useState(readDocumentUploadHistory());
+  const [uploadHistory, setUploadHistory] = useState(
+    readDocumentUploadHistory(),
+  );
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -74,7 +80,7 @@ export default function ScoresPage() {
 
   const uploadRows = useMemo(
     () => buildUploadRows(documents, uploadHistory),
-    [documents, uploadHistory]
+    [documents, uploadHistory],
   );
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -87,25 +93,37 @@ export default function ScoresPage() {
     });
   }, [uploadRows, normalizedQuery]);
 
-  const latestUploadedTitle = uploadRows[0]?.title || "No uploaded document yet";
+  const latestUploadedTitle =
+    uploadRows[0]?.title || "No uploaded document yet";
 
   const momentum =
     stats.sessionsStarted > 0
-      ? Math.min(100, Math.round((stats.questionsAnswered / stats.sessionsStarted) * 20))
+      ? Math.min(
+          100,
+          Math.round((stats.questionsAnswered / stats.sessionsStarted) * 20),
+        )
       : 0;
 
   return (
-    <AppShell title="History" subtitle="Your uploaded document history in one place.">
+    <AppShell
+      title="History"
+      subtitle="Your uploaded document history in one place."
+    >
       <div className="space-y-6">
-        <section className="relative overflow-hidden rounded-[28px] border-t-0bg-[linear-gradient(125deg,rgba(10,18,44,0.95)_0%,rgba(19,17,39,0.95)_52%,rgba(8,25,41,0.95)_100%)] p-5 shadow-[0_24px_60px_rgba(2,8,24,0.45)] sm:p-6">
+        <section className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(125deg,rgba(10,18,44,0.95)_0%,rgba(19,17,39,0.95)_52%,rgba(8,25,41,0.95)_100%)] p-5 shadow-[0_24px_60px_rgba(2,8,24,0.45)] sm:p-6">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(45%_70%_at_12%_0%,rgba(52,201,255,0.24)_0%,transparent_70%),radial-gradient(42%_60%_at_88%_10%,rgba(143,136,255,0.2)_0%,transparent_70%)]" />
 
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-300">Activity Ledger</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-100 sm:text-4xl">Learning History</h2>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-300">
+                Activity Ledger
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-100 sm:text-4xl">
+                Learning History
+              </h2>
               <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
-                Review all uploaded job descriptions and keep track of your latest learning documents.
+                Review all uploaded job descriptions and keep track of your
+                latest learning documents.
               </p>
             </div>
 
@@ -117,28 +135,45 @@ export default function ScoresPage() {
 
           <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
             <article className="rounded-2xl border border-[rgba(148,163,184,0.22)] bg-[rgba(9,14,30,0.68)] p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Uploaded Docs</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-100">{uploadRows.length}</p>
-              <p className="mt-1 text-xs text-slate-400">Files in your learning history</p>
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Uploaded Docs
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-100">
+                {uploadRows.length}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Files in your learning history
+              </p>
             </article>
 
             <article className="rounded-2xl border border-[rgba(148,163,184,0.22)] bg-[rgba(9,14,30,0.68)] p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Latest Upload</p>
-              <p className="mt-2 truncate text-lg font-semibold text-slate-100">{trimText(latestUploadedTitle, 45)}</p>
-              <p className="mt-1 text-xs text-slate-400">Most recently uploaded document</p>
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Latest Upload
+              </p>
+              <p className="mt-2 truncate text-lg font-semibold text-slate-100">
+                {trimText(latestUploadedTitle, 45)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Most recently uploaded document
+              </p>
             </article>
 
             <article className="rounded-2xl border border-[rgba(148,163,184,0.22)] bg-[rgba(9,14,30,0.68)] p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">Practice Sessions</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-100">{stats.sessionsStarted}</p>
-              <p className="mt-1 text-xs text-slate-400">Total sessions started</p>
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Practice Sessions
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-100">
+                {stats.sessionsStarted}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Total sessions started
+              </p>
             </article>
           </div>
         </section>
 
         <section className="rounded-3xl  border-t-0 bg-[rgba(18,22,34,0.78)] p-4 backdrop-blur-xl sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            
             <label className="flex w-full items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.25)] bg-[rgba(8,12,22,0.68)] px-3 py-2 lg:max-w-sm">
               <FiSearch className="text-sm text-slate-500" />
               <input
@@ -157,7 +192,9 @@ export default function ScoresPage() {
               <FiBookOpen className="text-base text-cyan-300" />
               Document Upload History
             </h3>
-            <span className="text-xs uppercase tracking-[0.14em] text-slate-500">{filteredUploadRows.length} items</span>
+            <span className="text-xs uppercase tracking-[0.14em] text-slate-500">
+              {filteredUploadRows.length} items
+            </span>
           </div>
 
           <div className="space-y-2">
@@ -168,8 +205,12 @@ export default function ScoresPage() {
                   className="flex flex-col gap-2 rounded-2xl border border-[rgba(148,163,184,0.16)] bg-[rgba(8,12,22,0.58)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-100">{row.title}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">ID: {row.id}</p>
+                    <p className="truncate text-sm font-semibold text-slate-100">
+                      {row.title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      ID: {row.id}
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-2 text-xs">

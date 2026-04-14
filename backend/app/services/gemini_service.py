@@ -1,4 +1,5 @@
 ﻿import json
+from collections.abc import Iterable
 
 import google.generativeai as genai
 
@@ -6,6 +7,14 @@ from app.core.async_utils import run_blocking
 from app.config.settings import settings
 
 _configured = False
+_DEFAULT_GENERATION_MODELS = (
+    "models/gemini-2.5-flash",
+    "models/gemini-2.0-flash",
+    "models/gemini-2.5-flash-lite",
+    "models/gemini-flash-lite-latest",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+)
 
 
 def _ensure_configured() -> bool:
@@ -26,6 +35,82 @@ def _get_model_sync(model_name: str | None = None):
 
 async def get_model(model_name: str | None = None):
     return await run_blocking(_get_model_sync, model_name)
+
+
+def _to_model_list(value: str | Iterable[str] | None) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    models: list[str] = []
+    for item in value:
+        model_name = str(item or "").strip()
+        if model_name:
+            models.append(model_name)
+    return models
+
+
+def _generation_model_names_sync(preferred_models: Iterable[str] | None = None) -> list[str]:
+    ordered_candidates = [
+        *_to_model_list(preferred_models),
+        settings.gemini_model,
+        *_to_model_list(settings.gemini_model_fallbacks),
+        *_DEFAULT_GENERATION_MODELS,
+    ]
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in ordered_candidates:
+        model_name = str(item or "").strip()
+        if not model_name or model_name in seen:
+            continue
+        ordered.append(model_name)
+        seen.add(model_name)
+    return ordered
+
+
+def _generate_content_with_fallback_sync(
+    *,
+    prompt: str,
+    generation_config: dict | None = None,
+    preferred_models: Iterable[str] | None = None,
+):
+    if not _ensure_configured():
+        raise RuntimeError("LLM model is not configured. Set GEMINI_API_KEY first.")
+
+    last_error: Exception | None = None
+    for model_name in _generation_model_names_sync(preferred_models):
+        model = _get_model_sync(model_name)
+        if model is None:
+            continue
+        try:
+            response = model.generate_content(prompt, generation_config=generation_config)
+            return response, model_name
+        except Exception as exc:
+            last_error = exc
+
+    if last_error is not None:
+        message = str(last_error)
+        if "resource_exhausted" in message.lower() or "quota" in message.lower() or "429" in message:
+            raise RuntimeError("LLM quota exceeded for configured model(s).") from last_error
+        raise RuntimeError(f"LLM request failed across all configured models: {message[:220]}") from last_error
+
+    raise RuntimeError("No Gemini model could be initialized for content generation.")
+
+
+async def generate_content_with_fallback(
+    *,
+    prompt: str,
+    generation_config: dict | None = None,
+    preferred_models: Iterable[str] | None = None,
+):
+    return await run_blocking(
+        _generate_content_with_fallback_sync,
+        prompt=prompt,
+        generation_config=generation_config,
+        preferred_models=preferred_models,
+    )
 
 
 def _extract_text_sync(response) -> str:

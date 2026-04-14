@@ -143,6 +143,86 @@ function buildDisplaySummary(analysis, matchScore) {
   return raw || `Resume to JD match is ${matchScore}%.`;
 }
 
+function shouldMergeStrengthFragment(fragment) {
+  return /^(and|or|with|which|that|while|where|also|including|using)\b/i.test(
+    String(fragment || "").trim(),
+  );
+}
+
+function shouldAttachToPreviousPoint(fragment, previousPoint) {
+  const next = String(fragment || "").trim();
+  const prev = String(previousPoint || "").trim();
+  if (!next || !prev) return false;
+
+  // Attach tails when the previous fragment ends with a dangling preposition.
+  if (/\b(at|in|for|with|on|to|from|as)\.?$/i.test(prev)) return true;
+
+  const normalizedNext = next.replace(/[.!?]+$/, "").trim();
+  const words = normalizedNext.split(/\s+/).filter(Boolean);
+  const hasVerb =
+    /\b(is|are|was|were|am|be|been|being|work|works|working|worked|led|built|developed|managed|created|designed|have|has|had|do|does|did|can|will)\b/i.test(
+      normalizedNext,
+    );
+
+  // Attach short company-style tails like "47billion".
+  return words.length > 0 && words.length <= 3 && !hasVerb;
+}
+
+function buildStrengthPoints(items) {
+  const points = [];
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const normalized = String(item || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!normalized) return;
+
+    const fragments = normalized
+      .split(/(?<=[.!?])\s+|\s*;\s*|\n+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    const source = fragments.length ? fragments : [normalized];
+    source.forEach((fragment) => {
+      if (points.length && shouldMergeStrengthFragment(fragment)) {
+        points[points.length - 1] = `${points[points.length - 1]} ${fragment}`
+          .replace(/\s+/g, " ")
+          .trim();
+        return;
+      }
+      if (
+        points.length &&
+        shouldAttachToPreviousPoint(fragment, points[points.length - 1])
+      ) {
+        points[points.length - 1] = `${points[points.length - 1]} ${fragment}`
+          .replace(/\s+/g, " ")
+          .trim();
+        return;
+      }
+      points.push(fragment);
+    });
+  });
+
+  const seen = new Set();
+  const cleaned = [];
+  for (const point of points) {
+    let text = String(point || "")
+      .replace(/^[•\-]\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) continue;
+    if (!/[.!?]$/.test(text)) text = `${text}.`;
+
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(text);
+    if (cleaned.length >= 5) break;
+  }
+
+  return cleaned;
+}
+
 function UploadFileCard({
   title,
   subtitle,
@@ -158,18 +238,26 @@ function UploadFileCard({
           <FiPaperclip className="text-sm" />
         </span>
         <div className="min-w-0">
-          <h2 className="whitespace-nowrap text-[1.75rem] font-semibold leading-none tracking-tight text-slate-100">{title}</h2>
+          <h2 className="whitespace-nowrap text-[1.75rem] font-semibold leading-none tracking-tight text-slate-100">
+            {title}
+          </h2>
           <p className="ui-page-kicker">{subtitle}</p>
         </div>
       </div>
 
       <div className="min-h-[145px] rounded-2xl border border-slate-800/90 bg-[#0a1028] p-3.5">
         <p className="ui-page-kicker">{fileLabel}</p>
-        <p className="mt-2 min-h-[24px] text-sm text-slate-200">{file ? file.name : "No file selected"}</p>
+        <p className="mt-2 min-h-[24px] text-sm text-slate-200">
+          {file ? file.name : "No file selected"}
+        </p>
         <p className="mt-1.5 text-xs leading-5 text-slate-500">{helper}</p>
       </div>
 
-      <button type="button" onClick={onUploadClick} className="mt-4 ui-btn-secondary w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">
+      <button
+        type="button"
+        onClick={onUploadClick}
+        className="mt-4 ui-btn-secondary w-full border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+      >
         <FiPaperclip className="text-sm" />
         Upload
       </button>
@@ -190,7 +278,9 @@ function LoadingScreen({ phaseIndex, elapsedSeconds }) {
 
         <h2 className="ui-page-title mt-8">Building Your Ecosystem</h2>
         <p className="ui-page-subtitle mt-3">{ANALYSIS_PHASES[phaseIndex]}</p>
-        <p className="mt-1 text-sm text-slate-500">Elapsed: {elapsedSeconds}s</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Elapsed: {elapsedSeconds}s
+        </p>
       </div>
     </section>
   );
@@ -251,7 +341,9 @@ export default function AnalysisPage() {
     const intervalId = setInterval(() => {
       const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
       setElapsedSeconds(elapsed);
-      setPhaseIndex(Math.min(ANALYSIS_PHASES.length - 1, Math.floor(elapsed / 5)));
+      setPhaseIndex(
+        Math.min(ANALYSIS_PHASES.length - 1, Math.floor(elapsed / 5)),
+      );
     }, 1000);
 
     return () => clearInterval(intervalId);
@@ -264,25 +356,44 @@ export default function AnalysisPage() {
   }, [error]);
 
   const matchScore = Number(analysis?.overall_score || 0);
-  const matchedSkills = analysis?.matched_skills?.length ? analysis.matched_skills : analysis?.matched_keywords || [];
-  const missingSkills = analysis?.missing_skills?.length ? analysis.missing_skills : analysis?.missing_keywords || [];
+  const matchedSkills = analysis?.matched_skills?.length
+    ? analysis.matched_skills
+    : analysis?.matched_keywords || [];
+  const missingSkills = analysis?.missing_skills?.length
+    ? analysis.missing_skills
+    : analysis?.missing_keywords || [];
   const resumeHighlights = analysis?.resume_highlights || [];
+  const strengthPoints = buildStrengthPoints(resumeHighlights);
   const displayCompany = deriveCompanyName(analysis, jdFile);
   const displayRole = deriveRoleName(analysis, jdFile);
   const displaySummary = buildDisplaySummary(analysis, matchScore);
   const weaknessPoints = analysis?.low_match_reasons?.length
     ? analysis.low_match_reasons
-    : missingSkills.map((skill) => `Limited proof for ${skill} in current resume.`);
-  const verdictLabel = analysis?.verdict || (matchScore >= 70 ? "Strong Match" : matchScore >= 45 ? "Moderate Match" : "Low Match");
+    : missingSkills.map(
+        (skill) => `Limited proof for ${skill} in current resume.`,
+      );
+  const verdictLabel =
+    analysis?.verdict ||
+    (matchScore >= 70
+      ? "Strong Match"
+      : matchScore >= 45
+        ? "Moderate Match"
+        : "Low Match");
   const fitBadgeClass =
     matchScore >= 70
       ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
       : matchScore >= 45
-      ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
-      : "border-rose-500/50 bg-rose-500/15 text-rose-300";
-  const skillCoverage = Math.round((matchedSkills.length / Math.max(1, matchedSkills.length + missingSkills.length)) * 100);
+        ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+        : "border-rose-500/50 bg-rose-500/15 text-rose-300";
+  const skillCoverage = Math.round(
+    (matchedSkills.length /
+      Math.max(1, matchedSkills.length + missingSkills.length)) *
+      100,
+  );
   const immediateFocus = (
-    (analysis?.critical_missing_skills?.length ? analysis.critical_missing_skills : missingSkills) || []
+    (analysis?.critical_missing_skills?.length
+      ? analysis.critical_missing_skills
+      : missingSkills) || []
   ).slice(0, 3);
   const strengthPreview = resumeHighlights.slice(0, 2);
 
@@ -298,7 +409,7 @@ export default function AnalysisPage() {
     if (!snapshot) return;
     sessionStorage.setItem(
       ANALYSIS_BACK_CACHE_KEY,
-      JSON.stringify({ analysis: snapshot, savedAt: Date.now() })
+      JSON.stringify({ analysis: snapshot, savedAt: Date.now() }),
     );
   }
 
@@ -374,10 +485,14 @@ export default function AnalysisPage() {
                 AI-Powered Career Accelerator
               </p>
               <h2 className="mt-3 text-2xl font-semibold leading-[1.2] tracking-tight text-slate-100 sm:text-3xl md:text-5xl">
-                Bridge The Gap To Your <span className="bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">Dream Career</span>
+                Bridge The Gap To Your{" "}
+                <span className="bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
+                  Dream Career
+                </span>
               </h2>
               <p className="ui-page-subtitle mx-auto mt-2 max-w-xl text-sm">
-                Upload your resume and job description to get skill-gap insights, role-fit analysis, and a guided learning plan.
+                Upload your resume and job description to get skill-gap
+                insights, role-fit analysis, and a guided learning plan.
               </p>
             </div>
 
@@ -414,16 +529,22 @@ export default function AnalysisPage() {
                 onClick={runAnalysis}
                 className="inline-flex min-w-[220px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#7c8cff,#9c7cf8)] px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-[0_18px_36px_rgba(99,102,241,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[260px]"
               >
-                
                 Analyze Match
                 <FiZap className="text-base" />
               </button>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Powered by Neural Engine v4.0</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                Powered by Neural Engine v4.0
+              </p>
             </div>
           </section>
         )}
 
-        {loading && <LoadingScreen phaseIndex={phaseIndex} elapsedSeconds={elapsedSeconds} />}
+        {loading && (
+          <LoadingScreen
+            phaseIndex={phaseIndex}
+            elapsedSeconds={elapsedSeconds}
+          />
+        )}
 
         {analysis && !loading && (
           <section className="flex-1 space-y-7">
@@ -437,19 +558,31 @@ export default function AnalysisPage() {
                     }}
                   >
                     <div className="flex h-full w-full flex-col items-center justify-center rounded-full border border-slate-700 bg-[#0a112a] text-center">
-                      <p className="text-6xl font-semibold tracking-tight text-slate-100">{matchScore}%</p>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Match Score</p>
+                      <p className="text-6xl font-semibold tracking-tight text-slate-100">
+                        {matchScore}%
+                      </p>
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        Match Score
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${fitBadgeClass}`}>
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${fitBadgeClass}`}
+                  >
                     AI Validated Analysis
                   </span>
-                  <h2 className="mt-3 text-5xl font-semibold leading-none tracking-tight text-slate-100">{displayCompany}</h2>
-                  <p className="mt-2 text-3xl font-medium text-indigo-300">{displayRole}</p>
-                  <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">{displaySummary}</p>
+                  <h2 className="mt-3 text-5xl font-semibold leading-none tracking-tight text-slate-100">
+                    {displayCompany}
+                  </h2>
+                  <p className="mt-2 text-3xl font-medium text-indigo-300">
+                    {displayRole}
+                  </p>
+                  <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
+                    {displaySummary}
+                  </p>
 
                   <div className="mt-5 flex flex-wrap gap-2">
                     <button
@@ -476,14 +609,18 @@ export default function AnalysisPage() {
               <article className="rounded-[26px] border border-slate-800  p-5 shadow-[0_18px_36px_rgba(2,8,24,0.35)]">
                 <div className="flex items-center gap-2">
                   <FiCheckCircle className="text-base text-emerald-300" />
-                  <h3 className="text-3xl font-semibold tracking-tight text-slate-100">Resume Insights</h3>
+                  <h3 className="text-3xl font-semibold tracking-tight text-slate-100">
+                    Resume Insights
+                  </h3>
                 </div>
 
                 <div className="mt-4 space-y-5">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-300">Key Strengths</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-300">
+                      Key Strengths
+                    </p>
                     <ul className="mt-2 space-y-2 text-sm text-slate-300">
-                      {resumeHighlights.slice(0, 3).map((point) => (
+                      {strengthPoints.slice(0, 3).map((point) => (
                         <li key={point} className="flex gap-2">
                           <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-300" />
                           <span>{point}</span>
@@ -493,7 +630,9 @@ export default function AnalysisPage() {
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-rose-300">Weaknesses</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-rose-300">
+                      Weaknesses
+                    </p>
                     <ul className="mt-2 space-y-2 text-sm text-slate-300">
                       {weaknessPoints.slice(0, 3).map((point) => (
                         <li key={point} className="flex gap-2">
@@ -510,7 +649,9 @@ export default function AnalysisPage() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <FiTarget className="text-base text-indigo-300" />
-                    <h3 className="text-2xl font-semibold tracking-tight text-slate-100">Core JD Strengths</h3>
+                    <h3 className="text-2xl font-semibold tracking-tight text-slate-100">
+                      Core JD Strengths
+                    </h3>
                   </div>
                   <span className="rounded-md border border-indigo-500/40 bg-indigo-500/10 px-2 py-1 text-xs font-medium text-indigo-200">
                     {matchedSkills.length}
@@ -520,32 +661,46 @@ export default function AnalysisPage() {
                 {matchedSkills.length ? (
                   <div className="mt-4 space-y-2">
                     {matchedSkills.slice(0, 5).map((skill) => (
-                      <div key={skill} className="rounded-lg border border-slate-700/80 bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
+                      <div
+                        key={skill}
+                        className="rounded-lg border border-slate-700/80 bg-slate-900/40 px-3 py-2 text-sm text-slate-200"
+                      >
                         {skill}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-400">No strengths extracted yet.</p>
+                  <p className="mt-4 text-sm text-slate-400">
+                    No strengths extracted yet.
+                  </p>
                 )}
 
-                <p className="mt-4 text-xs text-slate-500">Top matched skills identified from JD and resume alignment.</p>
+                <p className="mt-4 text-xs text-slate-500">
+                  Top matched skills identified from JD and resume alignment.
+                </p>
               </article>
             </div>
 
             <section className="space-y-4">
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <h3 className="text-4xl font-semibold tracking-tight text-slate-100">Identified Skill Gaps</h3>
-                  <p className="mt-1 text-sm text-slate-400">Personalized roadmaps generated by CareerPilot AI to bridge your deficits.</p>
+                  <h3 className="text-4xl font-semibold tracking-tight text-slate-100">
+                    Identified Skill Gaps
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Personalized roadmaps generated by CareerPilot AI to bridge
+                    your deficits.
+                  </p>
                 </div>
-              
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {missingSkills.length ? (
                   missingSkills.map((skill, index) => {
-                    const severity = getSeverityByIndex(index, missingSkills.length);
+                    const severity = getSeverityByIndex(
+                      index,
+                      missingSkills.length,
+                    );
                     const severityClass =
                       severity === "HIGH"
                         ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
@@ -559,13 +714,19 @@ export default function AnalysisPage() {
                         className="group rounded-2xl border border-slate-700 bg-[#0d142e] p-4 text-left transition hover:border-indigo-400/60 hover:bg-slate-900/60"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className={`rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${severityClass}`}>
+                          <span
+                            className={`rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${severityClass}`}
+                          >
                             {severity}
                           </span>
                           <FiArrowRight className="text-sm text-slate-500 transition group-hover:text-indigo-300" />
                         </div>
-                        <p className="mt-3 text-2xl font-semibold leading-tight text-slate-100">{skill}</p>
-                        <p className="mt-2 text-sm text-slate-400">{buildSkillNote(skill, analysis)}</p>
+                        <p className="mt-3 text-2xl font-semibold leading-tight text-slate-100">
+                          {skill}
+                        </p>
+                        <p className="mt-2 text-sm text-slate-400">
+                          {buildSkillNote(skill, analysis)}
+                        </p>
                         <span className="mt-4 inline-flex rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-200">
                           View Roadmap
                         </span>
@@ -574,15 +735,22 @@ export default function AnalysisPage() {
                   })
                 ) : (
                   <div className="rounded-2xl border border-emerald-600/40 bg-emerald-500/10 p-4 sm:col-span-2 xl:col-span-4">
-                    <p className="text-base font-semibold text-emerald-300">No major skill gaps found</p>
-                    <p className="mt-1 text-sm text-slate-300">Your resume aligns strongly with this role. Continue interview practice to improve confidence.</p>
+                    <p className="text-base font-semibold text-emerald-300">
+                      No major skill gaps found
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      Your resume aligns strongly with this role. Continue
+                      interview practice to improve confidence.
+                    </p>
                   </div>
                 )}
               </div>
             </section>
 
             <section className="space-y-4">
-              <h3 className="text-3xl font-semibold tracking-tight text-slate-100">Intelligence Quick Actions</h3>
+              <h3 className="text-3xl font-semibold tracking-tight text-slate-100">
+                Intelligence Quick Actions
+              </h3>
               <div className="grid gap-4 md:grid-cols-3">
                 <button
                   type="button"
@@ -592,8 +760,13 @@ export default function AnalysisPage() {
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-300">
                     <FiTarget className="text-lg" />
                   </span>
-                  <p className="mt-4 text-2xl font-semibold text-slate-100">Start Interview Prep</p>
-                  <p className="mt-2 text-sm text-slate-400">Simulate a high-pressure coding interview with CareerPilot AI tailored to your role.</p>
+                  <p className="mt-4 text-2xl font-semibold text-slate-100">
+                    Start Interview Prep
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Simulate a high-pressure coding interview with CareerPilot
+                    AI tailored to your role.
+                  </p>
                   <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-indigo-300">
                     Go to Simulator <FiArrowRight className="text-sm" />
                   </span>
@@ -607,8 +780,13 @@ export default function AnalysisPage() {
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300">
                     <FiPlay className="text-lg" />
                   </span>
-                  <p className="mt-4 text-2xl font-semibold text-slate-100">UpSkill Your Resume</p>
-                  <p className="mt-2 text-sm text-slate-400">Apply AI-suggested rewrites for your experience section to hit the JD keywords perfectly.</p>
+                  <p className="mt-4 text-2xl font-semibold text-slate-100">
+                    UpSkill Your Resume
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Apply AI-suggested rewrites for your experience section to
+                    hit the JD keywords perfectly.
+                  </p>
                   <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-violet-300">
                     Optimize Now <FiArrowRight className="text-sm" />
                   </span>
@@ -617,14 +795,23 @@ export default function AnalysisPage() {
                 <button
                   type="button"
                   disabled={!analysis.analysis_record_id}
-                  onClick={() => navigate(`/analysis/assessment?record=${analysis.analysis_record_id}`)}
+                  onClick={() =>
+                    navigate(
+                      `/analysis/assessment?record=${analysis.analysis_record_id}`,
+                    )
+                  }
                   className="group rounded-[22px] border border-slate-700 bg-[linear-gradient(145deg,rgba(16,185,129,0.15),rgba(9,18,44,0.85))] p-5 text-left transition hover:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
                     <FiZap className="text-lg" />
                   </span>
-                  <p className="mt-4 text-2xl font-semibold text-slate-100">Enter Skill Lab</p>
-                  <p className="mt-2 text-sm text-slate-400">Hands-on micro-projects focused specifically on your identified gaps.</p>
+                  <p className="mt-4 text-2xl font-semibold text-slate-100">
+                    Enter Skill Lab
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Hands-on micro-projects focused specifically on your
+                    identified gaps.
+                  </p>
                   <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-emerald-300">
                     Start Lab <FiArrowRight className="text-sm" />
                   </span>

@@ -613,7 +613,7 @@ def test_analyze_match_filters_llm_false_sql_missing_when_mysql_present() -> Non
     assert not any("sql" == item or "sql" in item for item in lowered_critical)
 
 
-def test_analyze_match_raises_when_llm_required_but_unavailable() -> None:
+def test_analyze_match_falls_back_when_llm_refinement_is_unavailable() -> None:
     engine = SyncAnalysisEngine()
     engine.model = None
     engine._candidate_model_names = lambda: []
@@ -621,14 +621,16 @@ def test_analyze_match_raises_when_llm_required_but_unavailable() -> None:
     previous_llm_refinement = settings.analysis_llm_refinement
     try:
         settings.analysis_llm_refinement = True
-        try:
-            engine.analyze_match(
-                jd_text="Need Python backend engineer with SQL.",
-                resume_text="Python and SQL project experience.",
-            )
-            assert False, "Expected RuntimeError when LLM is required but unavailable"
-        except RuntimeError as exc:
-            assert "llm analysis is required" in str(exc).lower()
+        result = engine.analyze_match(
+            jd_text="Need Python backend engineer with SQL.",
+            resume_text="Python and SQL project experience.",
+        )
+        assert isinstance(result, dict)
+        assert result["uses_llm"] is False
+        assert any(
+            "heuristic analysis was used" in str(item).lower()
+            for item in result.get("recommendations", [])
+        )
     finally:
         settings.analysis_llm_refinement = previous_llm_refinement
 

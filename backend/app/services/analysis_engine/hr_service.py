@@ -6,6 +6,7 @@ from app.services.document_parser import chunk_text
 from app.services.embedding_service import _cosine_similarity_sync as cosine_similarity, embedding_service
 from app.services.gemini_service import (
     _extract_text_sync as extract_text,
+    _generation_model_names_sync as generation_model_names,
     _get_model_sync as get_model,
     _parse_json_response_sync as parse_json_response,
 )
@@ -862,21 +863,6 @@ class AnalysisHrMixin:
         return cleaned[:20000]
 
     def _candidate_model_names(self) -> list[str]:
-        preferred = [
-            settings.gemini_model,
-            "models/gemini-2.0-flash",
-            "models/gemini-flash-lite-latest",
-            "models/gemini-2.5-flash-lite",
-            "models/gemini-2.5-flash",
-        ]
-        seen: set[str] = set()
-        ordered: list[str] = []
-        for item in preferred:
-            if not item:
-                continue
-            if item not in seen:
-                ordered.append(item)
-                seen.add(item)
-        return ordered
+        return generation_model_names()
 
 
