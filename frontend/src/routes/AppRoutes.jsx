@@ -12,21 +12,14 @@ import LoginPage from "../pages/LoginPage";
 import OnboardingPage from "../pages/OnboardingPage";
 import SettingsPage from "../pages/SettingsPage";
 import ScoresPage from "../pages/ScoresPage";
+import { hasValidSession } from "../utils/auth";
 
 function RequireAuth({ children }) {
-  return localStorage.getItem("jarvis_token") ? (
-    children
-  ) : (
-    <Navigate to="/login" replace />
-  );
+  return hasValidSession() ? children : <Navigate to="/login" replace />;
 }
 
 function GuestOnly({ children }) {
-  return localStorage.getItem("jarvis_token") ? (
-    <Navigate to="/analysis" replace />
-  ) : (
-    children
-  );
+  return hasValidSession() ? <Navigate to="/analysis" replace /> : children;
 }
 
 export default function AppRoutes() {

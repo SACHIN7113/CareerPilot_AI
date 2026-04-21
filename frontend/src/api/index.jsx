@@ -1,3 +1,5 @@
+import { clearAuthStorage, getValidStoredToken } from "../utils/auth";
+
 const API_URL = String(
   import.meta.env.VITE_API_URL || "http://localhost:8000",
 ).replace(/\/+$/, "");
@@ -5,13 +7,11 @@ const REQUEST_TIMEOUT_MS = 45000;
 const inflightGetRequests = new Map();
 const getResponseCache = new Map();
 
-let accessToken = localStorage.getItem("jarvis_token") || "";
+let accessToken = getValidStoredToken();
 
 function clearSession() {
   accessToken = "";
-  localStorage.removeItem("jarvis_token");
-  localStorage.removeItem("jarvis_email");
-  localStorage.removeItem("jarvis_name");
+  clearAuthStorage();
   inflightGetRequests.clear();
   getResponseCache.clear();
 }
