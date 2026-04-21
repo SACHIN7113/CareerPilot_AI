@@ -15,7 +15,6 @@ function decodeTokenPayload(token) {
     return null;
   }
 }
-
 export function isTokenExpired(token) {
   const payload = decodeTokenPayload(token);
   const exp = Number(payload?.exp);
