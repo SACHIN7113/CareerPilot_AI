@@ -22,6 +22,20 @@ const ANALYSIS_PHASES = [
   "Generating score, insights, and skill roadmap",
 ];
 const ANALYSIS_BACK_CACHE_KEY = "jarvis_analysis_back_cache";
+const RESUME_UPGRADE_INTENT_KEY = "jarvis_resume_upgrade_intent";
+
+function extractAnalysisRecordId(source) {
+  if (!source || typeof source !== "object") return "";
+
+  const candidate =
+    source.analysis_record_id ||
+    source.analysisRecordId ||
+    source.record_id ||
+    source._id ||
+    "";
+
+  return String(candidate || "").trim();
+}
 
 function normalizeFilename(value) {
   return String(value || "")
@@ -42,15 +56,38 @@ function isValidRoleCandidate(value) {
   if (!candidate) return false;
 
   const lowered = candidate.toLowerCase();
-  if (["this", "that", "this role", "role inferred from uploaded jd", "role", "unknown"].includes(lowered)) return false;
+  if (
+    [
+      "this",
+      "that",
+      "this role",
+      "role inferred from uploaded jd",
+      "role",
+      "unknown",
+    ].includes(lowered)
+  )
+    return false;
   if (/^is\s+/i.test(candidate)) return false;
-  if (/\b(ctc|lpa|salary|per annum|per year|if you think|job description|fresher|freshers|enthusiastic|curious|batch|students?)\b/i.test(candidate)) return false;
+  if (
+    /\b(ctc|lpa|salary|per annum|per year|if you think|job description|fresher|freshers|enthusiastic|curious|batch|students?)\b/i.test(
+      candidate,
+    )
+  )
+    return false;
 
-  const hasRoleHint = /\b(engineer|developer|analyst|intern|manager|support|specialist|tester|architect|executive|consultant|administrator|trainee|coordinator|sde|qa|lead|director|owner)\b/i.test(candidate);
+  const hasRoleHint =
+    /\b(engineer|developer|analyst|intern|manager|support|specialist|tester|architect|executive|consultant|administrator|trainee|coordinator|sde|qa|lead|director|owner)\b/i.test(
+      candidate,
+    );
   const hasLevelHint = /\b(l\d+|level\s*\d+)\b/i.test(candidate);
   if (!hasRoleHint && !hasLevelHint) return false;
 
-  if (/\b(match|ideal|fit)\b/i.test(candidate) && !/\b(engineer|developer|analyst|intern|manager|support|specialist|tester|architect|executive)\b/i.test(candidate)) {
+  if (
+    /\b(match|ideal|fit)\b/i.test(candidate) &&
+    !/\b(engineer|developer|analyst|intern|manager|support|specialist|tester|architect|executive)\b/i.test(
+      candidate,
+    )
+  ) {
     return false;
   }
 
@@ -62,8 +99,14 @@ function isValidCompanyCandidate(value) {
   if (!candidate) return false;
 
   const lowered = candidate.toLowerCase();
-  if (["the company", "our team", "company", "unknown"].includes(lowered)) return false;
-  if (/\b(if you think|join our team|ctc|lpa|salary|apply now|job description)\b/i.test(candidate)) return false;
+  if (["the company", "our team", "company", "unknown"].includes(lowered))
+    return false;
+  if (
+    /\b(if you think|join our team|ctc|lpa|salary|apply now|job description)\b/i.test(
+      candidate,
+    )
+  )
+    return false;
   if (candidate.split(/\s+/).length > 6) return false;
 
   return true;
@@ -90,7 +133,9 @@ function inferRoleFromSummary(summary) {
   const text = String(summary || "");
   if (!text) return "";
 
-  const match = text.match(/\bfor\s+(?:the\s+)?([A-Za-z0-9/&()\- ]{3,80})\s+role\b/i);
+  const match = text.match(
+    /\bfor\s+(?:the\s+)?([A-Za-z0-9/&()\- ]{3,80})\s+role\b/i,
+  );
   if (!match) return "";
 
   const candidate = String(match[1] || "").trim();
@@ -127,14 +172,18 @@ function getSeverityByIndex(index, total) {
 
 function buildSkillNote(skill, analysis) {
   const reasons = analysis?.low_match_reasons || [];
-  const found = reasons.find((reason) => reason.toLowerCase().includes(String(skill).toLowerCase()));
+  const found = reasons.find((reason) =>
+    reason.toLowerCase().includes(String(skill).toLowerCase()),
+  );
   return found || `Resume has limited direct evidence for ${skill}.`;
 }
 
 function buildDisplaySummary(analysis, matchScore) {
   const raw = String(analysis?.summary || "").trim();
   const verdict = String(analysis?.verdict || "").toLowerCase();
-  const lowReason = analysis?.low_match_reasons?.[0] || "Important required JD skills are still missing.";
+  const lowReason =
+    analysis?.low_match_reasons?.[0] ||
+    "Important required JD skills are still missing.";
 
   if (matchScore < 45 || verdict.includes("low")) {
     return `Current match is ${matchScore}%. You are a developing fit for this role. Main gap: ${lowReason}`;
@@ -241,7 +290,7 @@ function UploadFileCard({
           <h2 className="whitespace-nowrap text-[1.75rem] font-semibold leading-none tracking-tight text-slate-100">
             {title}
           </h2>
-          <p className="ui-page-kicker">{subtitle}</p>
+          <p className="ui-page-kicker mt-1">{subtitle}</p>
         </div>
       </div>
 
@@ -331,6 +380,44 @@ export default function AnalysisPage() {
   }, [location.state]);
 
   useEffect(() => {
+    if (loading || analysis) return;
+
+    try {
+      const raw = sessionStorage.getItem(RESUME_UPGRADE_INTENT_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw);
+      const createdAt = Number(parsed?.createdAt || 0);
+      const intentRecordId = String(parsed?.recordId || "").trim();
+      const ageMs = Date.now() - createdAt;
+
+      if (!createdAt || ageMs > 15000) {
+        sessionStorage.removeItem(RESUME_UPGRADE_INTENT_KEY);
+        return;
+      }
+
+      sessionStorage.removeItem(RESUME_UPGRADE_INTENT_KEY);
+      if (intentRecordId) {
+        navigate(
+          `/analysis/resume-upgrade?record=${encodeURIComponent(intentRecordId)}`,
+          {
+            replace: true,
+            state: { analysisRecordId: intentRecordId },
+          },
+        );
+        return;
+      }
+
+      navigate("/analysis/resume-upgrade", {
+        replace: true,
+        state: { analysisRecordId: "" },
+      });
+    } catch {
+      sessionStorage.removeItem(RESUME_UPGRADE_INTENT_KEY);
+    }
+  }, [analysis, loading, navigate]);
+
+  useEffect(() => {
     if (!loading) {
       setElapsedSeconds(0);
       setPhaseIndex(0);
@@ -390,6 +477,18 @@ export default function AnalysisPage() {
       Math.max(1, matchedSkills.length + missingSkills.length)) *
       100,
   );
+  const analysisRecordId =
+    extractAnalysisRecordId(analysis) ||
+    (() => {
+      try {
+        const raw = sessionStorage.getItem(ANALYSIS_BACK_CACHE_KEY);
+        if (!raw) return "";
+        const cached = JSON.parse(raw);
+        return extractAnalysisRecordId(cached?.analysis);
+      } catch {
+        return "";
+      }
+    })();
   const immediateFocus = (
     (analysis?.critical_missing_skills?.length
       ? analysis.critical_missing_skills
@@ -429,15 +528,39 @@ export default function AnalysisPage() {
   }
 
   function openSkillUpdate(skill) {
-    if (!analysis?.analysis_record_id) return;
+    if (!analysisRecordId) return;
 
     cacheAnalysisForBack(analysis);
 
-    const params = new URLSearchParams({ record: analysis.analysis_record_id });
+    const params = new URLSearchParams({ record: analysisRecordId });
     if (skill) {
       params.set("skill", skill);
     }
     navigate(`/analysis/skill-update?${params.toString()}`);
+  }
+
+  function openResumeUpgrade() {
+    cacheAnalysisForBack(analysis);
+
+    sessionStorage.setItem(
+      RESUME_UPGRADE_INTENT_KEY,
+      JSON.stringify({
+        createdAt: Date.now(),
+        recordId: analysisRecordId,
+      }),
+    );
+
+    if (analysisRecordId) {
+      const params = new URLSearchParams({ record: analysisRecordId });
+      navigate(`/analysis/resume-upgrade?${params.toString()}`, {
+        state: { analysisRecordId },
+      });
+      return;
+    }
+
+    navigate("/analysis/resume-upgrade", {
+      state: { analysisRecordId: "" },
+    });
   }
 
   return (
@@ -496,7 +619,7 @@ export default function AnalysisPage() {
               </p>
             </div>
 
-            <div className="mt-5 grid items-center justify-center gap-4 lg:grid-cols-[minmax(0,300px)_auto_minmax(0,300px)]">
+            <div className="mt-6 grid items-center justify-center gap-6 lg:grid-cols-[minmax(0,300px)_auto_minmax(0,300px)]">
               <UploadFileCard
                 title="Resume Content"
                 subtitle="Your Experience"
@@ -522,7 +645,7 @@ export default function AnalysisPage() {
               />
             </div>
 
-            <div className="mt-5 flex flex-col items-center justify-center gap-2.5">
+            <div className="mt-9 flex flex-col items-center justify-center gap-3">
               <button
                 type="button"
                 disabled={!jdFile || !resumeFile}
@@ -587,7 +710,7 @@ export default function AnalysisPage() {
                   <div className="mt-5 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      disabled={!analysis?.analysis_record_id}
+                      disabled={!analysisRecordId}
                       onClick={() => openSkillUpdate(missingSkills[0] || "")}
                       className="rounded-xl border border-indigo-400/50 bg-[linear-gradient(90deg,rgba(124,140,255,0.25),rgba(156,124,248,0.25))] px-5 py-2.5 text-sm font-semibold text-indigo-100 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -774,7 +897,7 @@ export default function AnalysisPage() {
 
                 <button
                   type="button"
-                  onClick={resetForFreshAnalysis}
+                  onClick={openResumeUpgrade}
                   className="group rounded-[22px] border border-slate-700 bg-[linear-gradient(145deg,rgba(79,70,229,0.2),rgba(9,18,44,0.85))] p-5 text-left transition hover:border-violet-400/50"
                 >
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300">
@@ -794,11 +917,9 @@ export default function AnalysisPage() {
 
                 <button
                   type="button"
-                  disabled={!analysis.analysis_record_id}
+                  disabled={!analysisRecordId}
                   onClick={() =>
-                    navigate(
-                      `/analysis/assessment?record=${analysis.analysis_record_id}`,
-                    )
+                    navigate(`/analysis/assessment?record=${analysisRecordId}`)
                   }
                   className="group rounded-[22px] border border-slate-700 bg-[linear-gradient(145deg,rgba(16,185,129,0.15),rgba(9,18,44,0.85))] p-5 text-left transition hover:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-50"
                 >

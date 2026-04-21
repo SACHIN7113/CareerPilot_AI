@@ -4,6 +4,7 @@ import AnalysisProcessPage from "../pages/AnalysisProcessPage";
 import AnalysisPage from "../pages/AnalysisPage";
 import AnalysisSkillQuizPage from "../pages/AnalysisSkillQuizPage";
 import AnalysisSkillUpdatePage from "../pages/AnalysisSkillUpdatePage";
+import AnalysisResumeUpgradePage from "../pages/AnalysisResumeUpgradePage";
 import ChangePasswordPage from "../pages/ChangePasswordPage";
 import DashboardPage from "../pages/DashboardPage";
 import DocumentsPage from "../pages/DocumentsPage";
@@ -13,11 +14,19 @@ import SettingsPage from "../pages/SettingsPage";
 import ScoresPage from "../pages/ScoresPage";
 
 function RequireAuth({ children }) {
-  return localStorage.getItem("jarvis_token") ? children : <Navigate to="/login" replace />;
+  return localStorage.getItem("jarvis_token") ? (
+    children
+  ) : (
+    <Navigate to="/login" replace />
+  );
 }
 
 function GuestOnly({ children }) {
-  return localStorage.getItem("jarvis_token") ? <Navigate to="/analysis" replace /> : children;
+  return localStorage.getItem("jarvis_token") ? (
+    <Navigate to="/analysis" replace />
+  ) : (
+    children
+  );
 }
 
 export default function AppRoutes() {
@@ -80,6 +89,14 @@ export default function AppRoutes() {
         element={
           <RequireAuth>
             <AnalysisSkillUpdatePage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/analysis/resume-upgrade"
+        element={
+          <RequireAuth>
+            <AnalysisResumeUpgradePage />
           </RequireAuth>
         }
       />

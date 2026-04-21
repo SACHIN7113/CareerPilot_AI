@@ -307,12 +307,24 @@ export function evaluateHrPractice(analysisRecordId, answers) {
   });
 }
 
+export function generateResumeUpgrade(analysisRecordId, customPrompt = "") {
+  return request("/api/analysis/resume-upgrade/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      analysis_record_id: analysisRecordId,
+      custom_prompt: customPrompt,
+    }),
+    timeoutMs: 45000,
+  });
+}
+
 export function startSkillUpdate(analysisRecordId) {
   return request("/api/analysis/skill-update/start", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ analysis_record_id: analysisRecordId }),
-    timeoutMs: 18000,
+    timeoutMs: 45000,
   });
 }
 
@@ -325,7 +337,9 @@ export function generateSkillRoadmap(analysisRecordId, target) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    timeoutMs: 30000,
+    timeoutMs: 120000,
+    retry: true,
+    retryCount: 1,
   });
 }
 
