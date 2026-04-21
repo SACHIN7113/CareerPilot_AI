@@ -23,6 +23,8 @@ from app.models.api_schemas import (
     ResumeAssessmentEvaluateRequest,
     ResumeAssessmentQuestionOut,
     ResumeAssessmentStartOut,
+    ResumeUpgradeGenerateRequest,
+    ResumeUpgradeOut,
     SkillRoadmapOut,
     SkillRoadmapRequest,
     SkillStepAssessmentEvaluateOut,
@@ -52,6 +54,37 @@ from app.services.skill_roadmap_service import (
 
 router = APIRouter()
 _skill_step_assessment_sessions: dict[str, dict[str, Any]] = {}
+_RESUME_UPGRADE_FORMAT_VERSION = 5
+
+
+def _is_resume_upgrade_cache_healthy(cached_result: dict[str, Any] | None) -> bool:
+    if not isinstance(cached_result, dict):
+        return False
+
+    ats_resume = str(cached_result.get("ats_resume") or "")
+    if len(ats_resume.strip()) < 80:
+        return False
+
+    required_sections = [
+        "PROFESSIONAL SUMMARY",
+        "WORK EXPERIENCE",
+        "PROJECTS",
+        "EDUCATION",
+        "SKILLS",
+    ]
+    if any(section not in ats_resume for section in required_sections):
+        return False
+
+    known_bad_patterns = [
+        "{'institution':",
+        "SUGGESTED SKILLS TO ADD",
+        "Built architected",
+        "\nExperience\n- Built",
+    ]
+    if any(pattern in ats_resume for pattern in known_bad_patterns):
+        return False
+
+    return True
 
 
 def _quick_skill_details(missing_skills: list[str], reasons: list[str]) -> list[dict[str, Any]]:
@@ -559,6 +592,97 @@ async def evaluate_skill_step_assessment(
         passed=passed,
         motivation=motivation,
         results=results,
+    )
+
+
+@router.post("/resume-upgrade/generate", response_model=ResumeUpgradeOut)
+async def generate_resume_upgrade(
+    payload: ResumeUpgradeGenerateRequest,
+    current_user: dict[str, Any] = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> ResumeUpgradeOut:
+    record = await db[COLLECTIONS["analysis_records"]].find_one(
+        {"_id": payload.analysis_record_id, "owner_id": current_user["_id"]}
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis record not found")
+
+    resume_text = str(record.get("resume_text") or "")
+    jd_text = str(record.get("jd_text") or "")
+    if len(resume_text.strip()) < 80:
+        raise HTTPException(status_code=400, detail="Analysis record is missing resume text")
+    if len(jd_text.strip()) < 80:
+        raise HTTPException(status_code=400, detail="Analysis record is missing JD text")
+
+    result = record.get("result") if isinstance(record.get("result"), dict) else {}
+    missing_skills = [
+        str(item).strip()
+        for item in (
+            result.get("missing_skills")
+            or result.get("critical_missing_skills")
+            or result.get("missing_keywords")
+            or []
+        )
+        if str(item).strip()
+    ]
+    suggested_roles = [
+        str(item).strip() for item in (result.get("suggested_roles") or []) if str(item).strip()
+    ]
+    target_role = suggested_roles[0] if suggested_roles else "Target Role"
+    custom_prompt = str(payload.custom_prompt or "").strip()
+
+    resume_upgrade = record.get("resume_upgrade") if isinstance(record.get("resume_upgrade"), dict) else {}
+    cached_result = resume_upgrade.get("last_result") if isinstance(resume_upgrade.get("last_result"), dict) else None
+    cached_prompt = str(resume_upgrade.get("last_prompt") or "").strip()
+    try:
+        cached_format_version = int(resume_upgrade.get("format_version") or 1)
+    except (TypeError, ValueError):
+        cached_format_version = 1
+
+    if (
+        cached_result
+        and cached_prompt == custom_prompt
+        and cached_format_version >= _RESUME_UPGRADE_FORMAT_VERSION
+        and _is_resume_upgrade_cache_healthy(cached_result)
+    ):
+        return ResumeUpgradeOut(
+            analysis_record_id=payload.analysis_record_id,
+            target_role=str(cached_result.get("target_role") or target_role),
+            ats_resume=str(cached_result.get("ats_resume") or ""),
+            missing_skills_considered=list(cached_result.get("missing_skills_considered") or missing_skills),
+            missing_skills_added=list(cached_result.get("missing_skills_added") or []),
+            improvement_notes=list(cached_result.get("improvement_notes") or []),
+            uses_llm=bool(cached_result.get("uses_llm") or False),
+        )
+
+    generated = await analysis_engine.generate_ats_resume_async(
+        jd_text=jd_text,
+        resume_text=resume_text,
+        missing_skills=missing_skills,
+        target_role=target_role,
+        custom_prompt=custom_prompt,
+    )
+
+    await db[COLLECTIONS["analysis_records"]].update_one(
+        {"_id": payload.analysis_record_id, "owner_id": current_user["_id"]},
+        {
+            "$set": {
+                "resume_upgrade.last_result": generated,
+                "resume_upgrade.last_prompt": custom_prompt,
+                "resume_upgrade.format_version": _RESUME_UPGRADE_FORMAT_VERSION,
+                "resume_upgrade.generated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
+
+    return ResumeUpgradeOut(
+        analysis_record_id=payload.analysis_record_id,
+        target_role=str(generated.get("target_role") or target_role),
+        ats_resume=str(generated.get("ats_resume") or ""),
+        missing_skills_considered=list(generated.get("missing_skills_considered") or missing_skills),
+        missing_skills_added=list(generated.get("missing_skills_added") or []),
+        improvement_notes=list(generated.get("improvement_notes") or []),
+        uses_llm=bool(generated.get("uses_llm") or False),
     )
 
 

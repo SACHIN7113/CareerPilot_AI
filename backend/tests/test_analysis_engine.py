@@ -794,3 +794,165 @@ def test_evaluate_resume_answers_returns_feedback_and_improved_answer() -> None:
     item = result["answer_feedback"][0]
     assert item["improved_answer"]
     assert isinstance(item["is_correct"], bool)
+
+
+def test_generate_ats_resume_handles_none_missing_skills_added() -> None:
+    engine = SyncAnalysisEngine()
+
+    async def _fake_llm_generate_ats_resume(**_kwargs):
+        return {
+            "ats_resume": (
+                "PROFESSIONAL SUMMARY\n"
+                "Backend-focused fresher with hands-on API and SQL project exposure.\n\n"
+                "WORK EXPERIENCE\n"
+                "Internship experience in backend development.\n\n"
+                "PROJECTS\n"
+                "Built FastAPI services with SQL integration.\n\n"
+                "SKILLS\n"
+                "Python, FastAPI, SQL\n"
+            ),
+            "missing_skills_added": None,
+            "improvement_notes": ["Aligned resume wording with JD requirements."],
+        }
+
+    engine.model = object()
+    engine._llm_generate_ats_resume = _fake_llm_generate_ats_resume
+    engine._is_resume_layout_malformed = lambda _text: False
+
+    previous_llm_refinement = settings.analysis_llm_refinement
+    try:
+        settings.analysis_llm_refinement = True
+        result = asyncio.run(
+            engine.generate_ats_resume_async(
+                jd_text=(
+                    "Backend Software Engineer role requiring Python, FastAPI, SQL, and API development. "
+                    "Candidate should be able to build production-ready web services."
+                ),
+                resume_text=(
+                    "Recent graduate with internship exposure in Python backend development. "
+                    "Built FastAPI APIs, integrated SQL queries, and delivered REST services in projects."
+                ),
+                missing_skills=["Docker", "Testing"],
+                target_role="Backend Software Engineer",
+                custom_prompt="Keep the resume ATS-friendly and concise.",
+            )
+        )
+    finally:
+        settings.analysis_llm_refinement = previous_llm_refinement
+
+    assert isinstance(result.get("missing_skills_added"), list)
+    assert result["target_role"] == "Backend Software Engineer"
+
+
+def test_generate_ats_resume_renders_template_payload_and_sanitizes_output() -> None:
+    engine = SyncAnalysisEngine()
+
+    async def _fake_llm_generate_ats_resume(**_kwargs):
+        return {
+            "summary": "Delivered delivered backend features for job-aligned applications",
+            "experience": [
+                "Delivered APIs for resume analysis workflows",
+                "Delivered APIs for resume analysis workflows",
+            ],
+            "projects": [
+                {
+                    "name": "CareerPilot AI",
+                    "bullets": [
+                        "Delivered end-to-end resume screening pipeline",
+                        "Designed a clean React and FastAPI workflow",
+                    ],
+                }
+            ],
+            "skills": ["Python", "FastAPI", "MongoDB", "REST API"],
+            "education": ["B.Tech Computer Science Engineering, Medi-Caps University"],
+            "missing_skills_added": ["Docker"],
+            "improvement_notes": ["Aligned the rewrite with ATS structure."],
+        }
+
+    engine.model = object()
+    engine._llm_generate_ats_resume = _fake_llm_generate_ats_resume
+
+    previous_llm_refinement = settings.analysis_llm_refinement
+    try:
+        settings.analysis_llm_refinement = True
+        result = asyncio.run(
+            engine.generate_ats_resume_async(
+                jd_text=(
+                    "Backend role requiring Python, FastAPI, MongoDB, and API development with strong project ownership."
+                ),
+                resume_text=(
+                    "Worked on full-stack internship projects using Python, React, FastAPI, and MongoDB with practical API usage."
+                ),
+                missing_skills=["Docker"],
+                target_role="Backend Engineer",
+                custom_prompt="Use template JSON format.",
+            )
+        )
+    finally:
+        settings.analysis_llm_refinement = previous_llm_refinement
+
+    ats_resume = str(result.get("ats_resume") or "")
+    assert result.get("uses_llm") is True
+    assert "PROFESSIONAL SUMMARY" in ats_resume
+    assert "WORK EXPERIENCE" in ats_resume
+    assert "PROJECTS" in ats_resume
+    assert "SKILLS" in ats_resume
+    assert "delivered" not in ats_resume.lower()
+    assert ats_resume.lower().count("developed apis for resume analysis workflows.") <= 1
+
+
+def test_generate_ats_resume_formats_dict_education_without_python_repr() -> None:
+    engine = SyncAnalysisEngine()
+
+    async def _fake_llm_generate_ats_resume(**_kwargs):
+        return {
+            "summary": "Strong backend-focused candidate with practical project experience.",
+            "experience": [
+                {
+                    "role": "Project Intern",
+                    "company": "47Billion",
+                    "duration": "06/2025 - 08/2025",
+                    "bullets": ["Developed backend APIs and improved performance"],
+                }
+            ],
+            "projects": [
+                {
+                    "name": "CareerPilot AI",
+                    "bullets": ["Built an ATS and skill-gap analyzer platform"],
+                }
+            ],
+            "skills": ["Python", "FastAPI", "MongoDB"],
+            "education": [
+                {
+                    "institution": "Medi-caps University",
+                    "degree": "Bachelor of Technology in Computer Science and Engineering",
+                    "cgpa": "7.79",
+                    "duration": "2022 - 2026",
+                }
+            ],
+            "missing_skills_added": [],
+            "improvement_notes": ["Polished format and language."],
+        }
+
+    engine.model = object()
+    engine._llm_generate_ats_resume = _fake_llm_generate_ats_resume
+
+    previous_llm_refinement = settings.analysis_llm_refinement
+    try:
+        settings.analysis_llm_refinement = True
+        result = asyncio.run(
+            engine.generate_ats_resume_async(
+                jd_text="Backend role requiring Python, FastAPI, and MongoDB.",
+                resume_text="SACHIN YADAV yadavsaching7113@gmail.com +91-9753711397",
+                missing_skills=["Docker"],
+                target_role="Backend Engineer",
+                custom_prompt="Keep original data and polish language only.",
+            )
+        )
+    finally:
+        settings.analysis_llm_refinement = previous_llm_refinement
+
+    ats_resume = str(result.get("ats_resume") or "")
+    assert "{'institution'" not in ats_resume
+    assert "Bachelor of Technology in Computer Science and Engineering" in ats_resume
+    assert "Medi-caps University" in ats_resume

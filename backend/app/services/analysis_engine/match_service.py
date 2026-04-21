@@ -594,11 +594,25 @@ class AnalysisMatchMixin:
         words = [word for word in normalized_term.split(" ") if len(word) >= 3]
         return len(words) >= 2 and all(word in normalized_text for word in words)
 
-    def _clean_skill_output(self, skills: list[str], *, max_items: int) -> list[str]:
+    def _clean_skill_output(
+        self,
+        skills: list[str] | tuple[str, ...] | set[str] | str | None,
+        *,
+        max_items: int,
+    ) -> list[str]:
+        if skills is None:
+            return []
+        if isinstance(skills, str):
+            source_items = [skills]
+        elif isinstance(skills, (list, tuple, set)):
+            source_items = list(skills)
+        else:
+            return []
+
         cleaned: list[str] = []
         seen: set[str] = set()
 
-        for skill in skills:
+        for skill in source_items:
             text = self._clean_text(skill, max_len=120)
             key = self._skill_key(text)
             if not text or not key or key in seen:

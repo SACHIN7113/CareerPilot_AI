@@ -252,6 +252,21 @@ class SkillStepAssessmentEvaluateOut(BaseModel):
     results: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ResumeUpgradeGenerateRequest(BaseModel):
+    analysis_record_id: str
+    custom_prompt: str | None = Field(default=None, max_length=1200)
+
+
+class ResumeUpgradeOut(BaseModel):
+    analysis_record_id: str
+    target_role: str = ""
+    ats_resume: str
+    missing_skills_considered: list[str] = Field(default_factory=list)
+    missing_skills_added: list[str] = Field(default_factory=list)
+    improvement_notes: list[str] = Field(default_factory=list)
+    uses_llm: bool = False
+
+
 class MCQAssessmentStartRequest(BaseModel):
     analysis_record_id: str
     question_count: int = Field(default=10, ge=10, le=20)

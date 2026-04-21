@@ -357,6 +357,23 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
             answers=answers,
         )
 
+    async def generate_ats_resume_async(
+        self,
+        *,
+        jd_text: str,
+        resume_text: str,
+        missing_skills: list[str] | None = None,
+        target_role: str = "",
+        custom_prompt: str = "",
+    ) -> dict:
+        return await self.generate_ats_resume(
+            jd_text=jd_text,
+            resume_text=resume_text,
+            missing_skills=missing_skills,
+            target_role=target_role,
+            custom_prompt=custom_prompt,
+        )
+
     async def generate_resume_mcq_assessment_async(
         self,
         *,
