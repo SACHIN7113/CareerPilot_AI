@@ -18,7 +18,12 @@ ROADMAP_VERSION = 2
 def _generate_json_with_timeout(*, model: Any, prompt: str, context: str, timeout_seconds: float = 14.0):
     executor = ThreadPoolExecutor(max_workers=1)
     generation_config = {"temperature": 0.2, "response_mime_type": "application/json"}
-    future = executor.submit(model.generate_content, f"{prompt}\n\n{context}", generation_config=generation_config)
+    future = executor.submit(
+        model.generate_content,
+        f"{prompt}\n\n{context}",
+        generation_config=generation_config,
+        request_options={"timeout": 15},
+    )
     try:
         return future.result(timeout=timeout_seconds)
     except FutureTimeoutError:

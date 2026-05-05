@@ -10,7 +10,7 @@ from app.services.gemini_service import (
     _parse_json_response_sync as parse_json_response,
 )
 class AnalysisMatchMixin:
-    async def analyze_match(
+    def analyze_match(
         self,
         *,
         jd_text: str,
@@ -211,6 +211,17 @@ class AnalysisMatchMixin:
         missing_skills = self._prune_redundant_skills(missing_skills, max_items=12)
         critical_missing_skills = self._prune_redundant_skills(critical_missing_skills, max_items=12)
 
+        # Significant boost if no major gaps are found after reconciliation
+        if not critical_missing_skills and not missing_skills:
+            overall_score = max(overall_score, 85)
+            if overall_score < 95:
+                overall_score += 10
+        elif not critical_missing_skills and len(missing_skills) <= 1:
+            overall_score = max(overall_score, 78)
+
+        overall_score = min(100, overall_score)
+        verdict = self._score_to_verdict(overall_score)
+
         matched_keywords = matched_skills
         missing_keywords = missing_skills
 
@@ -340,10 +351,17 @@ class AnalysisMatchMixin:
         max_attempts = 1 if settings.analysis_fast_mode else len(model_candidates)
         for model in model_candidates[:max_attempts]:
             try:
-                response = model.generate_content(
-                    f"{prompt}\n\n{context}",
-                    generation_config={"temperature": 0.1, "response_mime_type": "application/json"},
-                )
+                try:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.1, "response_mime_type": "application/json"},
+                        request_options={"timeout": 15},
+                    )
+                except TypeError:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.1, "response_mime_type": "application/json"},
+                    )
                 raw = extract_text(response) or "{}"
                 parsed = parse_json_response(raw)
                 self.model = model
@@ -617,6 +635,10 @@ class AnalysisMatchMixin:
             key = self._skill_key(text)
             if not text or not key or key in seen:
                 continue
+            if re.search(r"\b(?:salary|package|compensation|stipend|benefit|benefits|ctc|lpa)\b", key):
+                continue
+            if re.fullmatch(r"(?:rs|inr)\s*\d[\d\s,]*(?:\.\d+)?", key):
+                continue
             if key in self._STOP_WORDS or key in self._CRITICAL_NOISE_TERMS:
                 continue
             if self._is_non_skill_key(key):
@@ -624,7 +646,14 @@ class AnalysisMatchMixin:
             if len(key.split(" ")) == 1:
                 if key in self._GENERIC_NOISE_TOKENS:
                     continue
-                if key not in self._TECH_HINT_TOKENS and key not in self._CANONICAL_SKILL_PATTERNS:
+                # Restrict single-word skills to known tech terms or patterns.
+                # This prevents random English words (please, labs, starts) from being skills.
+                is_known_tech = (
+                    key in self._TECH_HINT_TOKENS or 
+                    key in self._CANONICAL_SKILL_PATTERNS or
+                    re.search(r"\b(?:api|sql|ml|ai|llm|devops|aws|gcp|azure)\b", key)
+                )
+                if not is_known_tech and len(key) < 5:
                     continue
             if len(key) < 2:
                 continue
@@ -1083,6 +1112,15 @@ class AnalysisMatchMixin:
         if key in self._NON_SKILL_TERMS:
             return True
 
+        if re.search(r"\b(?:salary|package|compensation|stipend|benefit|benefits|ctc|lpa)\b", key):
+            return True
+
+        if re.fullmatch(r"(?:rs|inr)\s*\d[\d\s,]*(?:\.\d+)?", key):
+            return True
+
+        if re.fullmatch(r"(?:b\s*tech|m\s*tech|btech|mtech|degree|graduate|fresher|freshers?|eligibility|eligible)", key):
+            return True
+
         if re.search(r"\b(?:btech|degree|graduate|fresher|eligibility|eligible)\b", key):
             return True
 
@@ -1167,6 +1205,10 @@ class AnalysisMatchMixin:
         for token in re.findall(r"[a-zA-Z][a-zA-Z0-9+#.-]{2,}", lower_text):
             normalized = token.strip(".-")
             if len(normalized) < 3 or normalized in self._STOP_WORDS:
+                continue
+            if self._is_non_skill_key(self._skill_key(normalized)):
+                continue
+            if re.fullmatch(r"(?:rs|inr)\s*\d[\d\s,]*(?:\.\d+)?", self._skill_key(normalized)):
                 continue
             tokens.append(normalized)
 

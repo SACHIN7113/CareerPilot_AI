@@ -52,6 +52,13 @@ _COMPANY_REJECT_TOKENS = {
     "batch",
     "freshers",
     "students",
+    "this position",
+    "this company",
+    "the company",
+    "this role",
+    "the organization",
+    "the client",
+    "our client",
 }
 
 _ROLE_REJECT_TOKENS = {
@@ -180,8 +187,10 @@ def _build_jd_overview_with_llm(normalized_text: str) -> dict[str, Any] | None:
     prompt = (
         "Analyze this company job description and return a student-friendly summary in strict JSON. "
         "Return only JSON with keys: company_name, role_title, overview, required_skills, key_requirements, what_to_prepare. "
-        "Requirements: overview should be simple and accurate in 2-3 sentences, required_skills max 12 items, "
-        "key_requirements max 6 bullet points, what_to_prepare max 5 practical tips."
+        "STRICT: company_name must be the hiring organization (e.g. 'Google', 'Divergent Software Labs Pvt. Ltd.'). "
+        "Search the entire text for the company name, often found in headers, footers, or 'About' sections. "
+        "Requirements: overview 2-3 sentences, required_skills max 12, key_requirements max 6, what_to_prepare max 5. "
+        "Exclude salary and eligibility from required skills."
     )
 
     try:
@@ -200,10 +209,16 @@ def _build_jd_overview_with_llm(normalized_text: str) -> dict[str, Any] | None:
 
 def _extract_company_name(text: str, filename: str) -> str:
     patterns = (
-        r"(?:about\s+company|company\s+name|organization)\s*[:\-]\s*([A-Za-z0-9&.,'\- ]{3,80})",
+        r"(?:about\s+company|company\s+name|organization|organisation|hiring\s+organization|hiring\s+organisation)\s*[:\-]?\s*([A-Za-z0-9&.,'\- ]{3,80})",
         r"\b([A-Z][A-Za-z0-9&.,'()\- ]{2,60})\s+is\s+(?:looking\s+for|hiring|seeking)\b",
+        r"\b([A-Z][A-Za-z0-9&.,'()\- ]{2,60})\s+(?:is|are)\s+(?:conducting|organizing|holding|running|hosting)\b",
         r"join\s+([A-Z][A-Za-z0-9&.,'\- ]{2,60})\s+(?:as|for|in)",
         r"at\s+([A-Z][A-Za-z0-9&.,'\- ]{2,60})\s+(?:as|for|in)",
+        r"hiring\s+at\s+([A-Z][A-Za-z0-9&.,'\- ]{2,60})",
+        r"opportunity\s+with\s+([A-Z][A-Za-z0-9&.,'\- ]{2,60})",
+        r"recruiting\s+for\s+([A-Z][A-Za-z0-9&.,'\- ]{2,60})",
+        r"position\s+at\s+([A-Z][A-Za-z0-9&.,'\- ]{2,60})",
+        r"\b([A-Z][A-Za-z0-9&.,'()\- ]{2,60}\s+(?:Labs|Technologies|Solutions|Systems|Services|Group|University|Company|Corp|Corporation|Private|Pvt\s*\.?\s*Ltd|Ltd\.?|Limited)(?:\s+(?:Pvt\s*\.?\s*Ltd|Ltd\.?|Limited))?)\b",
     )
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
@@ -365,10 +380,11 @@ def _build_fallback_payload(
 
 
 def _pick_identity_value(*, primary: str, secondary: str, placeholder: str) -> str:
-    if primary and primary != placeholder:
-        return primary
+    # Prioritize LLM (secondary) over heuristic (primary) if LLM found a valid value.
     if secondary and secondary != placeholder:
         return secondary
+    if primary and primary != placeholder:
+        return primary
     return placeholder
 
 
@@ -403,11 +419,14 @@ def _is_valid_company_candidate(value: str) -> bool:
     if re.search(r"\d+\s*(?:lpa|ctc)", lowered):
         return False
     if "." in candidate and len(candidate.split()) > 4:
-        return False
+        if not re.search(r"\b(pvt\.?|ltd\.?|limited|corp\.?|inc\.?)\b", lowered):
+            return False
     if len(candidate.split()) > 6:
         return False
-    if _is_role_like_phrase(candidate):
-        return False
+    # NOTE: We intentionally do NOT reject company names that contain role-like
+    # words (e.g. "Software Labs", "Tech Solutions", "Engineering Corp") because
+    # many real company names include such words. The old _is_role_like_phrase()
+    # check here was incorrectly rejecting valid company names.
 
     return True
 

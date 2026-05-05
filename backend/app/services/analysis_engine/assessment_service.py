@@ -10,7 +10,7 @@ from app.services.gemini_service import (
     _parse_json_response_sync as parse_json_response,
 )
 class AnalysisAssessmentMixin:
-    async def generate_mcq_assessment(self, *, jd_text: str, count: int = 10) -> dict:
+    def generate_mcq_assessment(self, *, jd_text: str, count: int = 10) -> dict:
         jd_clean = self._normalize(jd_text)
         requested_count = max(10, min(20, int(count or 10)))
         jd_terms = self._extract_ranked_terms(jd_clean, limit=30)
@@ -65,7 +65,7 @@ class AnalysisAssessmentMixin:
             "questions": normalized_questions[:requested_count],
         }
 
-    async def generate_resume_mcq_assessment(self, *, resume_text: str, jd_text: str = "", count: int = 10) -> dict:
+    def generate_resume_mcq_assessment(self, *, resume_text: str, jd_text: str = "", count: int = 10) -> dict:
         resume_clean = self._normalize(resume_text)
         jd_clean = self._normalize(jd_text)
         requested_count = max(10, min(20, int(count or 10)))
@@ -124,6 +124,8 @@ class AnalysisAssessmentMixin:
             # If resume has limited unique skills, create safe question variations to satisfy 10/20 count.
             variation_index = 0
             while len(normalized_questions) < requested_count and fallback_questions:
+                if variation_index > requested_count * 10:
+                    break
                 candidate = fallback_questions[variation_index % len(fallback_questions)]
                 variation_index += 1
                 sanitized = self._sanitize_mcq_question_item(candidate)
@@ -176,10 +178,17 @@ class AnalysisAssessmentMixin:
         max_attempts = min(2, len(model_candidates))
         for model in model_candidates[:max_attempts]:
             try:
-                response = model.generate_content(
-                    f"{prompt}\n\n{context}",
-                    generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
-                )
+                try:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+                        request_options={"timeout": 15},
+                    )
+                except TypeError:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+                    )
                 raw = extract_text(response) or "{}"
                 parsed = parse_json_response(raw)
                 questions = parsed.get("questions") if isinstance(parsed, dict) else None
@@ -314,10 +323,17 @@ class AnalysisAssessmentMixin:
         max_attempts = min(2, len(model_candidates))
         for model in model_candidates[:max_attempts]:
             try:
-                response = model.generate_content(
-                    f"{prompt}\n\n{context}",
-                    generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
-                )
+                try:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+                        request_options={"timeout": 15},
+                    )
+                except TypeError:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+                    )
                 raw = extract_text(response) or "{}"
                 parsed = parse_json_response(raw)
                 questions = parsed.get("questions") if isinstance(parsed, dict) else None
@@ -477,7 +493,7 @@ class AnalysisAssessmentMixin:
         )
         return any(token in text for token in behavioral_tokens)
 
-    async def generate_resume_questions(self, *, resume_text: str, jd_text: str = "", count: int = 10) -> dict:
+    def generate_resume_questions(self, *, resume_text: str, jd_text: str = "", count: int = 10) -> dict:
         resume_clean = self._normalize(resume_text)
         jd_clean = self._normalize(jd_text)
         requested_count = max(10, min(20, int(count or 10)))
@@ -570,10 +586,17 @@ class AnalysisAssessmentMixin:
         max_attempts = min(2, len(model_candidates))
         for model in model_candidates[:max_attempts]:
             try:
-                response = model.generate_content(
-                    f"{prompt}\n\n{context}",
-                    generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
-                )
+                try:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+                        request_options={"timeout": 15},
+                    )
+                except TypeError:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+                    )
                 raw = extract_text(response) or "{}"
                 parsed = parse_json_response(raw)
                 questions = parsed.get("questions") if isinstance(parsed, dict) else None

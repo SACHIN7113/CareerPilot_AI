@@ -51,7 +51,7 @@ class AnalysisResumeMixin:
         "Resolved",
     )
 
-    async def generate_ats_resume(
+    def generate_ats_resume(
         self,
         *,
         jd_text: str,
@@ -85,7 +85,7 @@ class AnalysisResumeMixin:
         uses_llm = False
 
         if settings.analysis_llm_refinement and self.model is not None:
-            llm_payload = await self._llm_generate_ats_resume(
+            llm_payload = self._llm_generate_ats_resume(
                 jd_text=jd_clean,
                 resume_text=resume_clean,
                 missing_skills=missing_focus,
@@ -146,7 +146,7 @@ class AnalysisResumeMixin:
             "uses_llm": uses_llm,
         }
 
-    async def evaluate_resume_answers(
+    def evaluate_resume_answers(
         self,
         *,
         jd_text: str,
@@ -272,7 +272,7 @@ class AnalysisResumeMixin:
             "uses_llm": uses_llm,
         }
 
-    async def _llm_generate_ats_resume(
+    def _llm_generate_ats_resume(
         self,
         *,
         jd_text: str,
@@ -348,24 +348,16 @@ class AnalysisResumeMixin:
         }
 
         try:
-            response = await asyncio.wait_for(
-                run_blocking(
-                    model.generate_content,
-                    request_text,
-                    generation_config=generation_config,
-                    request_options={"timeout": 12},
-                ),
-                timeout=15,
+            response = model.generate_content(
+                request_text,
+                generation_config=generation_config,
+                request_options={"timeout": 15},
             )
         except TypeError:
             try:
-                response = await asyncio.wait_for(
-                    run_blocking(
-                        model.generate_content,
-                        request_text,
-                        generation_config=generation_config,
-                    ),
-                    timeout=15,
+                response = model.generate_content(
+                    request_text,
+                    generation_config=generation_config,
                 )
             except Exception:
                 return {}
