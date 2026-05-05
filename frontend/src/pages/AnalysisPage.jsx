@@ -99,7 +99,7 @@ function isValidCompanyCandidate(value) {
   if (!candidate) return false;
 
   const lowered = candidate.toLowerCase();
-  if (["the company", "our team", "company", "unknown"].includes(lowered))
+  if (["the company", "our team", "company", "unknown", "this position", "selected job description", "this role"].includes(lowered))
     return false;
   if (
     /\b(if you think|join our team|ctc|lpa|salary|apply now|job description)\b/i.test(
@@ -124,9 +124,9 @@ function deriveCompanyName(analysis, jdFile) {
   if (direct) return direct;
 
   const parts = splitFilenameParts(analysis?.jd_filename || jdFile?.name || "");
-  if (parts.length >= 2 && isValidCompanyCandidate(parts[0])) return parts[0];
+  if (parts.length >= 1 && isValidCompanyCandidate(parts[0])) return parts[0];
 
-  return "Selected Job Description";
+  return "Hiring Organization";
 }
 
 function inferRoleFromSummary(summary) {
