@@ -21,7 +21,20 @@ def _extract_text_sync(filename: str, data: bytes) -> str:
         return text.strip()
     if lower_name.endswith(".docx"):
         document = docx.Document(BytesIO(data))
-        text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        fragments: list[str] = []
+        fragments.extend(paragraph.text for paragraph in document.paragraphs)
+
+        for table in document.tables:
+            for row in table.rows:
+                row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if row_cells:
+                    fragments.append(" | ".join(row_cells))
+
+        for section in document.sections:
+            fragments.extend(paragraph.text for paragraph in section.header.paragraphs)
+            fragments.extend(paragraph.text for paragraph in section.footer.paragraphs)
+
+        text = "\n".join(fragment for fragment in fragments if fragment and fragment.strip())
         return text.strip()
     raise UnsupportedFileTypeError("Only .txt, .pdf, and .docx files are supported")
 

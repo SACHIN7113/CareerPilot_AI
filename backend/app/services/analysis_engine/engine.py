@@ -2,7 +2,7 @@ import re
 from collections import Counter
 
 from app.config.settings import settings
-from app.services.document_parser import chunk_text
+from app.services.document_parser import _chunk_text_sync as chunk_text
 from app.services.embedding_service import _cosine_similarity_sync as cosine_similarity, embedding_service
 from app.services.gemini_service import (
     _extract_text_sync as extract_text,
@@ -160,6 +160,10 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         "relocation",
         "shift",
         "bond",
+        "lateral",
+        "mar",
+        "this position",
+        "the company",
     }
 
     _TECH_HINT_TOKENS = {
@@ -205,6 +209,33 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         "bug",
         "troubleshooting",
         "git",
+        "github",
+        "gitlab",
+        "ai",
+        "llm",
+        "genai",
+        "prompt",
+        "backend",
+        "frontend",
+        "fullstack",
+        "cloud",
+        "agile",
+        "scrum",
+        "npm",
+        "pip",
+        "yaml",
+        "json",
+        "graphql",
+        "database",
+        "redis",
+        "kafka",
+        "golang",
+        "kotlin",
+        "swift",
+        "ruby",
+        "php",
+        "dotnet",
+        "unity",
     }
 
     _GENERIC_NOISE_TOKENS = {
@@ -217,6 +248,39 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         "user",
         "platform",
         "role",
+        "lateral",
+        "mar",
+        "computer",
+        "software",
+        "engineering",
+        "artificial",
+        "intelligence",
+        "technology",
+        "system",
+        "systems",
+        "solutions",
+        "industry",
+        "please",
+        "login",
+        "dated",
+        "campus",
+        "batch",
+        "organisation",
+        "organization",
+        "registration",
+        "starts",
+        "ends",
+        "pvt",
+        "ltd",
+        "divergent",
+        "labs",
+        "overall",
+        "alignment",
+        "evidence",
+        "need",
+        "needed",
+        "required",
+        "mandatory",
     }
 
     _MOTIVATION_TOKENS = {
@@ -312,14 +376,17 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         resume_text: str,
         practice_answers: list[dict[str, str]] | None = None,
     ) -> dict:
-        return await self.analyze_match(
+        from app.core.async_utils import run_blocking
+        return await run_blocking(
+            self.analyze_match,
             jd_text=jd_text,
             resume_text=resume_text,
             practice_answers=practice_answers,
         )
 
     async def generate_hr_questions_async(self, *, jd_text: str, resume_text: str, count: int = 6) -> dict:
-        return await self.generate_hr_questions(jd_text=jd_text, resume_text=resume_text, count=count)
+        from app.core.async_utils import run_blocking
+        return await run_blocking(self.generate_hr_questions, jd_text=jd_text, resume_text=resume_text, count=count)
 
     async def evaluate_hr_answers_async(
         self,
@@ -328,17 +395,22 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         resume_text: str,
         answers: list[dict[str, str]],
     ) -> dict:
-        return await self.evaluate_hr_answers(
+        from app.core.async_utils import run_blocking
+        return await run_blocking(
+            self.evaluate_hr_answers,
             jd_text=jd_text,
             resume_text=resume_text,
             answers=answers,
         )
 
     async def generate_mcq_assessment_async(self, *, jd_text: str, count: int = 10) -> dict:
-        return await self.generate_mcq_assessment(jd_text=jd_text, count=count)
+        from app.core.async_utils import run_blocking
+        return await run_blocking(self.generate_mcq_assessment, jd_text=jd_text, count=count)
 
     async def generate_resume_questions_async(self, *, resume_text: str, jd_text: str = "", count: int = 10) -> dict:
-        return await self.generate_resume_questions(
+        from app.core.async_utils import run_blocking
+        return await run_blocking(
+            self.generate_resume_questions,
             resume_text=resume_text,
             jd_text=jd_text,
             count=count,
@@ -351,7 +423,9 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         resume_text: str,
         answers: list[dict[str, str]],
     ) -> dict:
-        return await self.evaluate_resume_answers(
+        from app.core.async_utils import run_blocking
+        return await run_blocking(
+            self.evaluate_resume_answers,
             jd_text=jd_text,
             resume_text=resume_text,
             answers=answers,
@@ -366,7 +440,9 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         target_role: str = "",
         custom_prompt: str = "",
     ) -> dict:
-        return await self.generate_ats_resume(
+        from app.core.async_utils import run_blocking
+        return await run_blocking(
+            self.generate_ats_resume,
             jd_text=jd_text,
             resume_text=resume_text,
             missing_skills=missing_skills,
@@ -381,7 +457,9 @@ class AnalysisEngine(AnalysisMatchMixin, AnalysisAssessmentMixin, AnalysisResume
         jd_text: str = "",
         count: int = 10,
     ) -> dict:
-        return await self.generate_resume_mcq_assessment(
+        from app.core.async_utils import run_blocking
+        return await run_blocking(
+            self.generate_resume_mcq_assessment,
             resume_text=resume_text,
             jd_text=jd_text,
             count=count,

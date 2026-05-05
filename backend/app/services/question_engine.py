@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import re
 from typing import Sequence
 
@@ -541,10 +541,17 @@ class QuestionEngine:
             '{"question":"...","answer":"..."}. '
             f"Difficulty: {difficulty_label}. Attempt index: {attempt_index}."
         )
-        response = model.generate_content(
-            f"{prompt}\n\nContext:\n{context}",
-            generation_config={"temperature": 0.1, "response_mime_type": "application/json"},
-        )
+        try:
+            response = model.generate_content(
+                f"{prompt}\n\nContext:\n{context}",
+                generation_config={"temperature": 0.25, "response_mime_type": "application/json"},
+                request_options={"timeout": 15},
+            )
+        except TypeError:
+            response = model.generate_content(
+                f"{prompt}\n\nContext:\n{context}",
+                generation_config={"temperature": 0.25, "response_mime_type": "application/json"},
+            )
         raw = extract_text(response) or "{}"
 
         question_raw = ""

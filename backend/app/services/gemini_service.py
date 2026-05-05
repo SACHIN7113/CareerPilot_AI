@@ -1,4 +1,4 @@
-﻿import json
+import json
 from collections.abc import Iterable
 
 import google.generativeai as genai
@@ -85,7 +85,14 @@ def _generate_content_with_fallback_sync(
         if model is None:
             continue
         try:
-            response = model.generate_content(prompt, generation_config=generation_config)
+            try:
+                response = model.generate_content(
+                    prompt,
+                    generation_config=generation_config,
+                    request_options={"timeout": 15},
+                )
+            except TypeError:
+                response = model.generate_content(prompt, generation_config=generation_config)
             return response, model_name
         except Exception as exc:
             last_error = exc
@@ -163,9 +170,19 @@ def _embed_text_sync(text: str, *, task_type: str) -> list[float] | None:
         }
         try:
             try:
-                response = genai.embed_content(**kwargs, output_dimensionality=settings.embedding_dimensions)
+                try:
+                    response = genai.embed_content(
+                        **kwargs,
+                        output_dimensionality=settings.embedding_dimensions,
+                        request_options={"timeout": 10},
+                    )
+                except TypeError:
+                    response = genai.embed_content(**kwargs, request_options={"timeout": 10})
             except TypeError:
-                response = genai.embed_content(**kwargs)
+                try:
+                    response = genai.embed_content(**kwargs, output_dimensionality=settings.embedding_dimensions)
+                except TypeError:
+                    response = genai.embed_content(**kwargs)
 
             if isinstance(response, dict):
                 vector = response.get("embedding", [])

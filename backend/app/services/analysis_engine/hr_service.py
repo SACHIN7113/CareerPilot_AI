@@ -11,7 +11,7 @@ from app.services.gemini_service import (
     _parse_json_response_sync as parse_json_response,
 )
 class AnalysisHrMixin:
-    async def generate_hr_questions(self, *, jd_text: str, resume_text: str, count: int = 6) -> dict:
+    def generate_hr_questions(self, *, jd_text: str, resume_text: str, count: int = 6) -> dict:
         _ = jd_text
         _ = resume_text
         requested_count = max(1, min(8, int(count or 6)))
@@ -40,7 +40,7 @@ class AnalysisHrMixin:
         ]
         return question_bank[: max(1, min(8, count))]
 
-    async def evaluate_hr_answers(
+    def evaluate_hr_answers(
         self,
         *,
         jd_text: str,
@@ -253,10 +253,17 @@ class AnalysisHrMixin:
 
         for model in model_candidates:
             try:
-                response = model.generate_content(
-                    f"{prompt}\n\n{context}",
-                    generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
-                )
+                try:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.15, "response_mime_type": "application/json"},
+                        request_options={"timeout": 15},
+                    )
+                except TypeError:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.15, "response_mime_type": "application/json"},
+                    )
                 raw = extract_text(response) or "{}"
                 parsed = parse_json_response(raw)
                 self.model = model
@@ -492,10 +499,17 @@ class AnalysisHrMixin:
             max_attempts = min(2, len(model_candidates))
         for model in model_candidates[:max_attempts]:
             try:
-                response = model.generate_content(
-                    f"{prompt}\n\n{context}",
-                    generation_config={"temperature": 0.15, "response_mime_type": "application/json"},
-                )
+                try:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.15, "response_mime_type": "application/json"},
+                        request_options={"timeout": 15},
+                    )
+                except TypeError:
+                    response = model.generate_content(
+                        f"{prompt}\n\n{context}",
+                        generation_config={"temperature": 0.15, "response_mime_type": "application/json"},
+                    )
                 raw = extract_text(response) or "{}"
                 parsed = parse_json_response(raw)
                 if isinstance(parsed, dict):

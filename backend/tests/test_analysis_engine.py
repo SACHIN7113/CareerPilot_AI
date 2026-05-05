@@ -164,6 +164,37 @@ def test_analyze_match_filters_noisy_critical_terms() -> None:
     assert "give" not in lowered_critical
 
 
+def test_analyze_match_filters_salary_and_degree_noise_from_skills() -> None:
+    engine = SyncAnalysisEngine()
+    engine.model = _FakeModel(
+        {
+            "overall_score": 55,
+            "verdict": "Moderate Match",
+            "critical_missing_skills": ["m.tech", "rs.300000"],
+            "matched_keywords": ["python", "rs.350000"],
+            "missing_keywords": ["rs.300000", "m.tech", "fastapi"],
+            "jd_key_points": ["Role requires backend development and a relevant degree."],
+            "resume_highlights": ["Python and FastAPI project experience."],
+            "recommendations": ["Add more backend evidence."],
+            "summary": "Baseline result.",
+        }
+    )
+
+    jd = "Role requires Python, FastAPI, and a relevant degree with a salary of Rs.300000."
+    resume = "Built Python and FastAPI services with SQL."
+
+    result = engine.analyze_match(jd_text=jd, resume_text=resume)
+
+    all_skills = {
+        item.lower()
+        for item in result["matched_keywords"] + result["missing_keywords"] + result["critical_missing_skills"]
+    }
+
+    assert "m.tech" not in all_skills
+    assert "rs.300000" not in all_skills
+    assert "rs.350000" not in all_skills
+
+
 def test_analyze_match_reconciles_matched_and_missing_skill_variants() -> None:
     engine = SyncAnalysisEngine()
     engine.model = _FakeModel(
